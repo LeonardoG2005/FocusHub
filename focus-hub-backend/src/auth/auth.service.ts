@@ -22,25 +22,32 @@ export class AuthService {
   ) { }
 
   async register(userData: SignUpDto): Promise<User> {
-    const existingUser = await this.usersRepository.findOne({ where: { email: userData.email } });
-    if (existingUser) {
-      throw new Error('Email already registered');
+    try {
+      console.log('Register called with:', userData);
+      const existingUser = await this.usersRepository.findOne({ where: { email: userData.email } });
+      if (existingUser) {
+        throw new Error('Email already registered');
+      }
+
+      const hashedPassword = await bcrypt.hash(userData.password, 10);
+
+      const newUser = this.usersRepository.create({
+        email: userData.email,
+        password: hashedPassword,
+        name: userData.name,
+        lastname: userData.lastname,
+        themePreference: 'light',
+        soundEnabled: true,
+      });
+
+      console.log('Saving user:', newUser);
+      const saved = await this.usersRepository.save(newUser);
+      console.log('User saved successfully:', saved);
+      return saved;
+    } catch (error) {
+      console.error('Register error:', error);
+      throw error;
     }
-
-    const hashedPassword = await bcrypt.hash(userData.password, 10);
-
-
-    const newUser = this.usersRepository.create({
-      email: userData.email,
-      password: hashedPassword,
-      name: userData.name,
-      lastname: userData.lastname,
-      themePreference: 'light',
-      soundEnabled: true,
-    });
-
-    // this.logger.log(`Creating user...${newUser.email} - ${newUser.name}`);
-    return this.usersRepository.save(newUser);
   }
 
 

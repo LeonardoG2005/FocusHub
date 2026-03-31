@@ -11,6 +11,16 @@ import { ProductivityModule } from './productivity/productivity.module';
 import { TasksModule } from './tasks/tasks.module';
 import { AuthModule } from './auth/auth.module';
 import { ConfigModule } from '@nestjs/config';
+import { User } from './users/user.entity';
+import { Task } from './tasks/task.entity';
+import { Category } from './categories/category.entity';
+import { Event } from './events/event.entity';
+import { AmbientSound } from './ambient-sound/ambient-sound.entity';
+import { TaskReminder } from './reminders/entities/task-reminder.entity';
+import { EventReminder } from './reminders/entities/event-reminder.entity';
+import { Technique } from './productivity/entities/technique.entity';
+import { FocusSession } from './productivity/entities/focus-session.entity';
+import { FocusSessionTask } from './productivity/entities/focus-session-task.entity';
 // import { MyLogger } from './logger.service';
 
 @Module({
@@ -18,13 +28,9 @@ import { ConfigModule } from '@nestjs/config';
       isGlobal: true,
     }),
     TypeOrmModule.forRoot({
-      type: 'mysql',
-      host: 'localhost',
-      port: 3306,
-      username: 'root',
-      password: '',
-      database: 'focushubdatabase',
-      entities: [__dirname + '/**/*.entity{.ts,.js}'],
+      type: 'sqlite',
+      database: 'focushub.db',
+      entities: [User, Task, Category, Event, AmbientSound, TaskReminder, EventReminder, Technique, FocusSession, FocusSessionTask],
       synchronize: true,
       logging: true,
     }),

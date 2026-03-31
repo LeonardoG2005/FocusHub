@@ -18,8 +18,8 @@ export class User {
   password: string;
 
   @Column({
-    type: 'enum',
-    enum: ['light', 'dark'],
+    type: 'varchar',
+    length: 50,
     default: 'light',
   })
   themePreference: 'light' | 'dark';

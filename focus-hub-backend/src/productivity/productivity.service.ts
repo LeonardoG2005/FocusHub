@@ -37,7 +37,13 @@ export class ProductivityService {
       throw new BadRequestException(`Technique with name '${name}' already exists for this user`);
     }
 
-    const technique = this.techniqueRepository.create({ ...createTechniqueDto, name, user });
+    const technique = this.techniqueRepository.create({
+      name,
+      user,
+      workTime: (createTechniqueDto.workDuration || 0) * 60,  // Convert minutes to seconds
+      shortBreak: (createTechniqueDto.breakDuration || 0) * 60,  // Convert minutes to seconds
+      longBreak: (createTechniqueDto.longBreakDuration || 0) * 60,  // Convert minutes to seconds
+    });
     return this.techniqueRepository.save(technique);
   }
 
@@ -145,6 +151,27 @@ export class ProductivityService {
     });
   }
 
+  async getActiveFocusSession(userId: number): Promise<FocusSession> {
+    const focusSession = await this.focusSessionRepository.findOne({
+      where: { user: { id: userId }, status: 'in_progress' },
+      relations: ['technique', 'focusSessionTasks'],
+      order: { createdAt: 'DESC' },
+    });
+
+    if (!focusSession) {
+      throw new NotFoundException('No active focus session found for this user');
+    }
+
+    // Calculate remaining time
+    const now = new Date();
+    const elapsed = Math.floor((now.getTime() - focusSession.createdAt.getTime()) / 1000) + focusSession.elapsedSeconds;
+    
+    return {
+      ...focusSession,
+      elapsedSeconds: elapsed,
+    };
+  }
+
   async findOneFocusSession(id: number, userId: number): Promise<FocusSession> {
     const focusSession = await this.focusSessionRepository.findOne({
       where: { id, user: { id: userId } },
@@ -156,6 +183,21 @@ export class ProductivityService {
 
   async updateFocusSession(id: number, userId: number, updateFocusSessionDto: UpdateFocusSessionDto): Promise<FocusSession> {
     const focusSession = await this.findOneFocusSession(id, userId);
+    
+    // If status is being changed to paused, calculate and save elapsed time
+    if (updateFocusSessionDto.status === 'paused' && focusSession.status === 'in_progress') {
+      const now = new Date();
+      const newElapsed = Math.floor((now.getTime() - focusSession.createdAt.getTime()) / 1000) + focusSession.elapsedSeconds;
+      focusSession.elapsedSeconds = newElapsed;
+      focusSession.pausedAt = now;
+    }
+    
+    // If status is being changed from paused to in_progress, reset createdAt to now for accurate tracking
+    if (updateFocusSessionDto.status === 'in_progress' && focusSession.status === 'paused') {
+      focusSession.createdAt = new Date();
+      focusSession.pausedAt = undefined;
+    }
+
     Object.assign(focusSession, updateFocusSessionDto);
     return this.focusSessionRepository.save(focusSession);
   }
@@ -246,5 +288,37 @@ export class ProductivityService {
     }
 
     return sessions;
+  }
+
+  async seedDefaultTechniques(): Promise<Technique[]> {
+    // Populate default global techniques (no user)
+    const defaultTechniques = [
+      { name: 'Pomodoro', workDuration: 25, breakDuration: 5, longBreakDuration: 15 },
+      { name: 'Pomodoro Extendido', workDuration: 50, breakDuration: 10, longBreakDuration: 30 },
+      { name: 'Sesión Corta', workDuration: 15, breakDuration: 3, longBreakDuration: 10 },
+      { name: 'Sesión Larga', workDuration: 90, breakDuration: 15, longBreakDuration: 45 },
+    ];
+
+    const createdTechniques: Technique[] = [];
+
+    for (const techniqueData of defaultTechniques) {
+      const existingTechnique = await this.techniqueRepository.findOne({
+        where: { name: techniqueData.name.toLowerCase(), user: IsNull() },
+      });
+
+      if (!existingTechnique) {
+        const technique = this.techniqueRepository.create({
+          name: techniqueData.name.toLowerCase(),
+          workTime: techniqueData.workDuration * 60,
+          shortBreak: techniqueData.breakDuration * 60,
+          longBreak: techniqueData.longBreakDuration * 60,
+        } as any);
+        const saved: Technique = (await this.techniqueRepository.save(technique)) as unknown as Technique;
+        createdTechniques.push(saved);
+        console.log(`✅ Default technique created: ${saved.name}`);
+      }
+    }
+
+    return createdTechniques;
   }
 }

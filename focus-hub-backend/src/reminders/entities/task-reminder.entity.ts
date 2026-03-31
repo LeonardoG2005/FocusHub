@@ -10,7 +10,7 @@ export class TaskReminder {
   @Column({ type: 'datetime', nullable: false })
   reminderTime: Date;
 
-  @Column({ type: 'enum', enum: ['push', 'desktop'], default: 'push' })
+  @Column({ type: 'varchar', length: 50, default: 'push' })
   notificationType: 'push' | 'desktop';
 
   @Column({ type: 'tinyint', default: 1 })

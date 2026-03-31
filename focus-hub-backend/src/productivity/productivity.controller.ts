@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards,Request } from '@nestjs/common';
+import { Controller, Get, Post, Patch, Delete, Body, Param, Query, UseGuards, Request } from '@nestjs/common';
 import { ProductivityService } from './productivity.service';
 import { CreateTechniqueDto } from './dto/create-technique.dto';
 import { UpdateTechniqueDto } from './dto/update-technique.dto';
@@ -33,9 +33,11 @@ export class ProductivityController {
   }
 
   @Get('techniques/global')
-  @ApiOperation({ summary: 'Get all techniques without a specific user' })
+  @ApiOperation({ summary: 'Get all techniques without a specific user (populates defaults on first call)' })
   @ApiResponse({ status: 200, description: 'Return all global techniques' })
-  findAllTechniquesForAllUsers() {
+  async findAllTechniquesForAllUsers() {
+    // Seed default techniques if not already present
+    await this.productivityService.seedDefaultTechniques();
     return this.productivityService.findAllTechniquesForAllUsers();
  }
 
@@ -82,6 +84,14 @@ export class ProductivityController {
   @ApiResponse({ status: 200, description: 'Return all focus sessions' })
   findAllFocusSessions(@Query('userId') userId: number) {
     return this.productivityService.findAllFocusSessions(userId);
+  }
+
+  @Get('focus-sessions/active/:userId')
+  @ApiOperation({ summary: 'Get the active focus session for a user' })
+  @ApiResponse({ status: 200, description: 'Return the active focus session' })
+  @ApiResponse({ status: 404, description: 'No active focus session found' })
+  getActiveFocusSession(@Param('userId') userId: string) {
+    return this.productivityService.getActiveFocusSession(+userId);
   }
 
   @Get('focus-sessions/:id')

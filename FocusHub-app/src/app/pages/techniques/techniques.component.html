@@ -4,7 +4,7 @@
         <header>
             <h1>⏰ Técnicas de Concentración</h1>
             <div class="technique-selector">
-                <select #techniqueSelect (change)="changeTechnique($event)">
+                <select #techniqueSelect [value]="currentTechnique.name" (change)="changeTechnique($event)">
                     <option *ngFor="let t of techniques" [value]="t.name">{{ t.name }}</option>
                 </select>
                 <button (click)="showNewTechniqueModal()" class="btn-add">+ Nueva Técnica</button>
@@ -135,16 +135,16 @@
                         }
                     </div>
                     <div class="form-group">
-                        <label for="short-break">Duración del descanso corto (minutos)</label>
-                        <input type="number" id="short-break" formControlName="shortBreak" min="1" max="30" required>
-                        @if(newTechniqueForm.get('shortBreak')?.invalid && (newTechniqueForm.get('shortBreak')?.dirty || newTechniqueForm.get('shortBreak')?.touched)){
+                        <label for="break-duration">Duración del descanso corto (minutos)</label>
+                        <input type="number" id="break-duration" formControlName="breakDuration" min="1" max="30" required>
+                        @if(newTechniqueForm.get('breakDuration')?.invalid && (newTechniqueForm.get('breakDuration')?.dirty || newTechniqueForm.get('breakDuration')?.touched)){
                         <div class="error-message">El descanso debe ser entre 1 y 30 minutos.</div>
                         }
                     </div>
                     <div class="form-group">
-                        <label for="long-break">Duración del descanso largo (minutos, opcional)</label>
-                        <input type="number" id="long-break" formControlName="longBreak" min="0" max="60">
-                        @if(newTechniqueForm.get('longBreak')?.invalid && (newTechniqueForm.get('longBreak')?.dirty || newTechniqueForm.get('longBreak')?.touched)){
+                        <label for="long-break-duration">Duración del descanso largo (minutos, opcional)</label>
+                        <input type="number" id="long-break-duration" formControlName="longBreakDuration" min="0" max="60">
+                        @if(newTechniqueForm.get('longBreakDuration')?.invalid && (newTechniqueForm.get('longBreakDuration')?.dirty || newTechniqueForm.get('longBreakDuration')?.touched)){
                         <div class="error-message">El descanso largo debe ser entre 0 y 60 minutos.</div>
                         }
                     </div>

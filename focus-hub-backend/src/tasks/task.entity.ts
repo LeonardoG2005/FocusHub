@@ -20,10 +20,10 @@ export class Task {
   @Column({ type: 'datetime', nullable: true })
   dueDate?: Date;
 
-  @Column({ type: 'enum', enum: ['low', 'medium', 'high'], default: 'medium' })
+  @Column({ type: 'varchar', length: 50, default: 'medium' })
   priority?:'Low' | 'Medium' | 'High';
 
-  @Column({ type: 'enum', enum: ['pending', 'in_progress', 'completed', 'overdue'], default: 'pending' })
+  @Column({ type: 'varchar', length: 50, default: 'pending' })
   status: 'pending' | 'in_progress' | 'completed' | 'overdue';
 
   @ManyToOne(() => User, (user) => user.tasks, { nullable: false, onDelete: 'CASCADE' })

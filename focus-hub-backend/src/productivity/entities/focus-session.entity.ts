@@ -16,9 +16,14 @@ export class FocusSession {
   @JoinColumn({ name: 'techniques_id' })
   technique: Technique;
 
-  @Column({ type: 'enum', enum: ['in_progress', 'paused', 'completed'], default: 'in_progress' })
+  @Column({ type: 'varchar', length: 50, default: 'in_progress' })
   status: 'in_progress' | 'paused' | 'completed';
 
+  @Column({ type: 'int', default: 0, nullable: false })
+  elapsedSeconds: number = 0;
+
+  @Column({ type: 'datetime', nullable: true })
+  pausedAt?: Date;
 
   @CreateDateColumn()
   createdAt: Date;

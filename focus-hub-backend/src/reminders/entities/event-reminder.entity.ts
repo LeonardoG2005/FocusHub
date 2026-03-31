@@ -9,12 +9,7 @@ export class EventReminder {
   @Column({ type: 'datetime', nullable: false })
   reminderTime: Date;
 
-  @Column({
-    type: 'enum',
-    enum: ['push', 'desktop'],
-    default: 'push',
-    nullable: false,
-  })
+  @Column({ type: 'varchar', length: 50, default: 'push', nullable: false })
   notificationType: 'push' | 'desktop';
 
   @Column({ type: 'tinyint', default: 1, nullable: false })

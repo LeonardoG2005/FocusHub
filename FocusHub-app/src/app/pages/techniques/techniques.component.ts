@@ -41,6 +41,7 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
   timeLeft = signal(this.currentTechnique.workTime);
   sessionTasks = signal<Task[]>([]);
   focusSessionStatus: 'in_progress' | 'paused' | 'completed' | null = null;
+  private restoredFromActiveSession = false;
 
   fb = inject(FormBuilder);
 
@@ -55,8 +56,8 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
   newTechniqueForm: FormGroup = this.fb.group({
     name: ['', Validators.required],
     workDuration: [null, [Validators.required, Validators.min(1), Validators.max(120)]],
-    shortBreak: [null, [Validators.required, Validators.min(1), Validators.max(30)]],
-    longBreak: [0, [Validators.min(0), Validators.max(60)]],
+    breakDuration: [null, [Validators.required, Validators.min(1), Validators.max(30)]],
+    longBreakDuration: [0, [Validators.min(0), Validators.max(60)]],
   });
 
   @ViewChild('timerDisplay') timerDisplay!: ElementRef;
@@ -70,40 +71,103 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
 
 
   constructor(private renderer: Renderer2) {
-    this.taskService.loadTasks(); // Load tasks on init
-    this.techniqueService.fetchTechniques().subscribe(() => {
-      const list = this.techniqueService.techniques();
-      if (list && list.length > 0) {
-        // Try to find 'Pomodoro' or use the first technique
-        const pomodoro = list.find(t => t.name.toLowerCase().includes('pomodoro'));
-        this.currentTechnique = pomodoro || list[0];
-        this.timeLeft.set(this.currentTechnique.workTime);
-        this.updateTimerDisplay();
-        this.updateProgressCircle();
-      }
-    });
+    this.taskService.loadTasks();
   }
 
   ngOnInit(): void {
-    // Initialization is handled in constructor
+    // First restore local UI snapshot from singleton state.
+    const persistedState = this.techniqueService.techniquesUiState();
+    this.currentMode = persistedState.currentMode;
+    this.isRunning = persistedState.isRunning;
+    this.pomodoroCount = persistedState.pomodoroCount;
+
+    this.techniqueService.fetchTechniques().subscribe(() => {
+      const list = this.techniqueService.techniques();
+      if (!list || list.length === 0) return;
+
+      const persistedName = this.techniqueService.techniquesUiState().selectedTechniqueName;
+      const persistedTechnique = persistedName
+        ? list.find((t) => t.name === persistedName)
+        : undefined;
+      const pomodoro = list.find((t) => t.name.toLowerCase().includes('pomodoro'));
+
+      this.currentTechnique = persistedTechnique || pomodoro || list[0];
+
+      if (!this.restoredFromActiveSession) {
+        const totalForMode = this.getTotalSecondsForMode(this.currentMode);
+        const initialTime = persistedState.timeLeft > 0 ? persistedState.timeLeft : totalForMode;
+        this.timeLeft.set(initialTime);
+
+        // Fallback: if backend has no active session (e.g. break mode), continue local timer.
+        if (persistedState.isRunning && !this.timerIntervalSubscription) {
+          this.startTimerInterval();
+        }
+      }
+
+      this.techniqueService.setSelectedTechnique(this.currentTechnique.name);
+      this.persistUiState();
+      this.updateTimerDisplay();
+      this.updateProgressCircle();
+    });
+
+    // Check if there's an active focus session and restore it
+    const tokenData = this.tokenService.decodeToken();
+    const userId = tokenData?.sub;
+
+    if (userId) {
+      this.techniqueService.getActiveFocusSession(userId).subscribe({
+        next: (session) => {
+          if (session) {
+            console.log('✅ Active session found:', session);
+            // Restore the timer with elapsed time
+            const technique = session.technique;
+            this.currentTechnique = technique;
+            this.restoredFromActiveSession = true;
+            
+            // Calculate remaining time: workTime - elapsedSeconds
+            const remainingSeconds = technique.workTime - session.elapsedSeconds;
+            this.timeLeft.set(Math.max(0, remainingSeconds));
+            
+            this.focusSessionStatus = 'in_progress';
+            this.isRunning = true;
+            this.currentMode = 'work';
+            this.techniqueService.setSelectedTechnique(this.currentTechnique.name);
+            this.persistUiState();
+            
+            // Resume the timer immediately
+            this.startTimerInterval();
+            this.updateTimerDisplay();
+            this.updateProgressCircle();
+            
+            console.log(`⏱️ Session restored. Elapsed: ${session.elapsedSeconds}s, Remaining: ${remainingSeconds}s`);
+          }
+        },
+        error: (err) => {
+          console.log('No active session or error retrieving it:', err);
+        }
+      });
+    }
   }
 
 
 
 
   ngAfterViewInit(): void {
+    // Do not call setActiveTab here because it stops/resets the running timer.
+    this.activeTabIndex.set(this.currentMode === 'work' ? 0 : this.currentMode === 'shortBreak' ? 1 : 2);
     this.updateTimerDisplay();
     this.updateProgressCircle();
-    this.setActiveTab(0);
   }
 
   ngOnDestroy(): void {
     if (this.timerIntervalSubscription) {
       this.timerIntervalSubscription.unsubscribe();
     }
+    this.persistUiState();
   }
 
   updateTimerDisplay(): void {
+    if (!this.timerDisplay?.nativeElement) return;
     const minutes = Math.floor(this.timeLeft() / 60);
     const seconds = this.timeLeft() % 60;
     const formattedTime = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
@@ -114,6 +178,7 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   updateProgressCircle(): void {
+    if (!this.timerCircle?.nativeElement) return;
     let totalTime: number;
     if (this.currentMode === 'work') {
       totalTime = this.currentTechnique.workTime;
@@ -122,6 +187,8 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
     } else {
       totalTime = this.currentTechnique.longBreak;
     }
+
+    if (!totalTime || totalTime <= 0) return;
 
     const progress = (this.timeLeft() / totalTime) * 100;
     this.renderer.setStyle(
@@ -140,6 +207,7 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
     if (this.currentMode !== 'work') {
       // For breaks, just start the timer interval without creating sessions
       this.startTimerInterval();
+      this.persistUiState();
       return;
     }
 
@@ -173,6 +241,7 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
           }
 
           this.startTimerInterval();
+          this.persistUiState();
         },
         error: (err) => {
           console.error('Error creating focus session:', err);
@@ -187,6 +256,7 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
           next: () => {
             this.focusSessionStatus = 'in_progress';
             this.startTimerInterval();
+            this.persistUiState();
           },
           error: (err) => {
             console.error('Error updating session status:', err);
@@ -201,6 +271,7 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
     this.timerIntervalSubscription = interval(1000).subscribe(() => {
       if (this.timeLeft() > 0) {
         this.timeLeft.update(value => value - 1);
+        this.persistUiState();
         this.updateTimerDisplay();
         this.updateProgressCircle();
       } else {
@@ -243,6 +314,7 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
       this.timerIntervalSubscription = null;
     }
     this.isRunning = false;
+    this.persistUiState();
 
     // Pause the focus session
     const sessionId = this.techniqueService.currentFocusSessionId();
@@ -269,6 +341,7 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
     } else {
       this.timeLeft.set(this.currentTechnique.longBreak);
     }
+    this.persistUiState();
     this.updateTimerDisplay();
     this.updateProgressCircle();
   }
@@ -302,6 +375,7 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
       this.currentMode = 'longBreak';
       this.timeLeft.set(this.currentTechnique.longBreak);
     }
+    this.persistUiState();
     this.updateTimerDisplay();
     this.updateProgressCircle();
   }
@@ -331,8 +405,10 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
     const technique = this.techniqueService.getTechnique(selectedValue);
     if (!technique) return;
     this.currentTechnique = technique;
+    this.techniqueService.setSelectedTechnique(technique.name);
     this.currentMode = 'work';
     this.timeLeft.set(this.currentTechnique.workTime);
+    this.persistUiState();
     this.updateTimerDisplay();
     this.updateProgressCircle();
     this.resetTimer();
@@ -350,20 +426,16 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
 
   saveNewTechnique(): void {
     if (this.newTechniqueForm.valid) {
-      const newTechnique = this.newTechniqueForm.value;
-      const technique: Technique = {
-        name: newTechnique.name,
-        workTime: newTechnique.workDuration * 60,
-        shortBreak: newTechnique.shortBreak * 60,
-        longBreak: newTechnique.longBreak * 60,
-      };
-
-      this.techniqueService.addTechnique(technique).subscribe({
+      const formValue = this.newTechniqueForm.value;
+      // Send the form data directly to the service - it expects the backend DTO format
+      this.techniqueService.addTechnique(formValue).subscribe({
         next: (createdTechnique) => {
           // Service updates signals; just set currentTechnique to created one
           this.currentTechnique = createdTechnique;
+          this.techniqueService.setSelectedTechnique(createdTechnique.name);
           this.currentMode = 'work';
           this.timeLeft.set(this.currentTechnique.workTime);
+          this.persistUiState();
           this.updateTimerDisplay();
           this.updateProgressCircle();
           this.setActiveTab(0);
@@ -493,5 +565,21 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
 
   isTaskInSession(taskId: number): boolean {
     return this.sessionTasks().some(t => t.id === taskId);
+  }
+
+  private getTotalSecondsForMode(mode: 'work' | 'shortBreak' | 'longBreak'): number {
+    if (mode === 'work') return this.currentTechnique.workTime || 0;
+    if (mode === 'shortBreak') return this.currentTechnique.shortBreak || 0;
+    return this.currentTechnique.longBreak || 0;
+  }
+
+  private persistUiState(): void {
+    this.techniqueService.updateTechniquesUiState({
+      selectedTechniqueName: this.currentTechnique.name || null,
+      currentMode: this.currentMode,
+      timeLeft: this.timeLeft(),
+      isRunning: this.isRunning,
+      pomodoroCount: this.pomodoroCount,
+    });
   }
 }

@@ -4,6 +4,17 @@ import { Technique } from '../shared/interfaces/technique.interface';
 import { TokenService } from './token.service';
 import { Observable, forkJoin, of, tap, catchError, map } from 'rxjs';
 
+export type TimerMode = 'work' | 'shortBreak' | 'longBreak';
+
+export interface TechniquesUiState {
+  selectedTechniqueName: string | null;
+  currentMode: TimerMode;
+  timeLeft: number;
+  isRunning: boolean;
+  pomodoroCount: number;
+  lastUpdatedAt: number;
+}
+
 @Injectable({
   providedIn: 'root'
 })
@@ -13,16 +24,66 @@ export class TechniqueService {
   public techniques = signal<Technique[]>([]);
   public techniquesMap = signal<Record<string, Technique>>({});
   public currentFocusSessionId = signal<number | null>(null);
+  public techniquesUiState = signal<TechniquesUiState>({
+    selectedTechniqueName: null,
+    currentMode: 'work',
+    timeLeft: 0,
+    isRunning: false,
+    pomodoroCount: 0,
+    lastUpdatedAt: Date.now(),
+  });
 
   private readonly baseUrl = 'http://localhost:3000/productivity/techniques';
   private readonly sessionsUrl = 'http://localhost:3000/productivity/focus-sessions';
   private readonly sessionTasksUrl = 'http://localhost:3000/productivity/focus-session-tasks';
+  private readonly techniquesStateKey = 'focushub-techniques-state';
   private http = inject(HttpClient);
   private tokenService = inject(TokenService);
+
+  constructor() {
+    this.hydrateTechniquesUiState();
+  }
 
   private getUserId(): number | null {
     console.log("ID CON EL SUB: ",this.tokenService.decodeToken()?.sub);
     return this.tokenService.decodeToken()?.sub ?? null;
+  }
+
+  private hydrateTechniquesUiState(): void {
+    const stored = sessionStorage.getItem(this.techniquesStateKey);
+    if (!stored) return;
+
+    try {
+      const parsed = JSON.parse(stored) as TechniquesUiState;
+      this.techniquesUiState.set({
+        selectedTechniqueName: parsed.selectedTechniqueName ?? null,
+        currentMode: parsed.currentMode ?? 'work',
+        timeLeft: typeof parsed.timeLeft === 'number' ? parsed.timeLeft : 0,
+        isRunning: !!parsed.isRunning,
+        pomodoroCount: typeof parsed.pomodoroCount === 'number' ? parsed.pomodoroCount : 0,
+        lastUpdatedAt: typeof parsed.lastUpdatedAt === 'number' ? parsed.lastUpdatedAt : Date.now(),
+      });
+    } catch (error) {
+      console.warn('Could not parse persisted techniques UI state:', error);
+      sessionStorage.removeItem(this.techniquesStateKey);
+    }
+  }
+
+  private persistTechniquesUiState(): void {
+    sessionStorage.setItem(this.techniquesStateKey, JSON.stringify(this.techniquesUiState()));
+  }
+
+  updateTechniquesUiState(partial: Partial<TechniquesUiState>): void {
+    this.techniquesUiState.update((current) => ({
+      ...current,
+      ...partial,
+      lastUpdatedAt: Date.now(),
+    }));
+    this.persistTechniquesUiState();
+  }
+
+  setSelectedTechnique(name: string): void {
+    this.updateTechniquesUiState({ selectedTechniqueName: name });
   }
 
 fetchTechniques(): Observable<Technique[]> {
@@ -62,20 +123,20 @@ fetchTechniques(): Observable<Technique[]> {
     return this.techniquesMap()[name];
   }
 
-  addTechnique(technique: Technique): Observable<Technique> {
-    console.log("añadiendo tecnica:", technique)
+  addTechnique(techniqueData: any): Observable<Technique> {
+    console.log("Adding technique:", techniqueData);
     const userId = this.getUserId();
     if (!userId) {
       console.error('No userId found');
       return new Observable<Technique>();
     }
 
-    return this.http.post<Technique>(`${this.baseUrl}?userId=${userId}`, technique, this.getHeaders()).pipe(
+    return this.http.post<Technique>(`${this.baseUrl}?userId=${userId}`, techniqueData, this.getHeaders()).pipe(
       tap((newTechnique) => {
         const currentList = this.techniques();
         const currentMap = this.techniquesMap();
 
-        // Evitar duplicado
+        // Avoid duplicates
         if (!currentList.some(t => t.name === newTechnique.name)) {
           this.techniques.set([...currentList, newTechnique]);
         }
@@ -83,6 +144,10 @@ fetchTechniques(): Observable<Technique[]> {
         if (!currentMap[newTechnique.name]) {
           this.techniquesMap.set({ ...currentMap, [newTechnique.name]: newTechnique });
         }
+      }),
+      catchError((error) => {
+        console.error('Error adding technique:', error);
+        throw error;
       })
     );
   }
@@ -160,6 +225,19 @@ fetchTechniques(): Observable<Technique[]> {
       tap((session) => {
         this.currentFocusSessionId.set(session.id);
         console.log('✅ Focus session created:', session);
+      })
+    );
+  }
+
+  getActiveFocusSession(userId: number): Observable<any> {
+    return this.http.get<any>(`${this.sessionsUrl}/active/${userId}`, this.getHeaders()).pipe(
+      tap((session) => {
+        this.currentFocusSessionId.set(session.id);
+        console.log('✅ Active focus session retrieved:', session);
+      }),
+      catchError((error) => {
+        console.warn('No active focus session found:', error);
+        return of(null);
       })
     );
   }
