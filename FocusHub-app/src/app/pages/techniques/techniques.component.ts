@@ -118,7 +118,7 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
       this.techniqueService.getActiveFocusSession(userId).subscribe({
         next: (session) => {
           if (session) {
-            console.log('✅ Active session found:', session);
+            console.log('Active session found:', session);
             // Restore the timer with elapsed time
             const technique = session.technique;
             this.currentTechnique = technique;
@@ -139,7 +139,7 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
             this.updateTimerDisplay();
             this.updateProgressCircle();
             
-            console.log(`⏱️ Session restored. Elapsed: ${session.elapsedSeconds}s, Remaining: ${remainingSeconds}s`);
+            console.log(`Session restored. Elapsed: ${session.elapsedSeconds}s, Remaining: ${remainingSeconds}s`);
           }
         },
         error: (err) => {
@@ -491,7 +491,7 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
     const current = this.sessionTasks();
     const taskAlreadyInSession = current.find(t => t.id === task.id);
 
-    console.log('🔵 addTaskToSession called for task:', task.title, 'ID:', task.id);
+    console.log('addTaskToSession called for task:', task.title, 'ID:', task.id);
     console.log('   Task already in session?', !!taskAlreadyInSession);
     console.log('   Current session ID:', this.techniqueService.currentFocusSessionId());
     console.log('   Is running?', this.isRunning);
@@ -499,52 +499,52 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!taskAlreadyInSession) {
       // Add to local state
       this.sessionTasks.set([...current, task]);
-      console.log('✅ Task added to sessionTasks signal');
+      console.log('Task added to sessionTasks signal');
 
       // Add task to focus session in backend if session exists
       const sessionId = this.techniqueService.currentFocusSessionId();
       if (sessionId) {
-        console.log('📤 Posting to addTaskToFocusSession with sessionId:', sessionId);
+        console.log('Posting to addTaskToFocusSession with sessionId:', sessionId);
         this.techniqueService.addTaskToFocusSession(sessionId, task.id).subscribe({
           next: () => {
-            console.log('✅ Task added to focus session on backend');
+            console.log('Task added to focus session on backend');
           },
           error: (err) => {
-            console.error('❌ Error adding task to focus session:', err);
+            console.error('Error adding task to focus session:', err);
             // Remove from local state if failed
             this.removeTaskFromSession(task.id);
           }
         });
       } else {
-        console.log('⚠️ No active session - task added locally only');
+        console.log('No active session - task added locally only');
       }
     } else {
-      console.log('⚠️ Task already in session');
+      console.log('Task already in session');
     }
   }
 
   removeTaskFromSession(taskId: number): void {
-    console.log('🔴 removeTaskFromSession called with taskId:', taskId);
+    console.log('removeTaskFromSession called with taskId:', taskId);
     const sessionId = this.techniqueService.currentFocusSessionId();
     console.log('   Current session ID:', sessionId);
 
     // If session exists, delete from backend first
     if (sessionId) {
-      console.log('📤 Posting DELETE to removeTaskFromFocusSession...');
+      console.log('Posting DELETE to removeTaskFromFocusSession...');
       this.techniqueService.removeTaskFromFocusSession(sessionId, taskId).subscribe({
         next: () => {
           // Only remove from local state if API call succeeds
-          console.log('✅ Task removed from backend, now removing from local state');
+          console.log('Task removed from backend, now removing from local state');
           const current = this.sessionTasks();
           this.sessionTasks.set(current.filter(t => t.id !== taskId));
         },
         error: (err) => {
-          console.error('❌ Error removing task from focus session:', err);
+          console.error('Error removing task from focus session:', err);
         }
       });
     } else {
       // No session, just remove from local state
-      console.log('⚠️ No active session, removing from local state only');
+      console.log('No active session, removing from local state only');
       const current = this.sessionTasks();
       this.sessionTasks.set(current.filter(t => t.id !== taskId));
     }

@@ -1,4 +1,4 @@
-# 🧠 FocusHub
+# FocusHub
 
 FocusHub es una aplicación compuesta por un frontend en Angular y un backend en NestJS. Este repositorio está preparado para ejecutarse fácilmente usando Docker y Docker Compose.
 
@@ -9,9 +9,9 @@ Este proyecto utiliza:
 
 ---
 
-## 🚀 ¿Cómo ejecutar el proyecto desde cero?
+## ¿Cómo ejecutar el proyecto desde cero?
 
-### 📦 Requisitos previos
+### Requisitos previos
 
 Asegurarse de tener instalado Docker Desktop y luego abrirlo.
 
@@ -27,7 +27,7 @@ npm install -g @angular/cli@19.2.6
 ```
 ---
 
-### 🔁 Pasos para clonar y levantar la app
+### Pasos para clonar y levantar la app
 
 1. **Clona el repositorio:**
 
@@ -51,9 +51,9 @@ docker-compose up
 El archivo docker-compose.yml ya usa las imágenes de Docker Hub subidas (https://hub.docker.com/repository/docker/pholcast25/focus-hub-angular/general y https://hub.docker.com/repository/docker/pholcast25/focus-hub-nest-js/general) y no requiere que se instale nada más.
 
 Esto levanta los dos servicios de Frontend y Backend:
-📱 Frontend Angular en http://localhost:4200
+Frontend Angular en http://localhost:4200
 
-🧠 Backend NestJS en http://localhost:3000
+Backend NestJS en http://localhost:3000
 
 Además, puedes acceder a la documentación de la API (Swagger) en:
 http://localhost:3000/api

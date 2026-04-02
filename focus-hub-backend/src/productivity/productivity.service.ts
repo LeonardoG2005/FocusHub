@@ -315,7 +315,7 @@ export class ProductivityService {
         } as any);
         const saved: Technique = (await this.techniqueRepository.save(technique)) as unknown as Technique;
         createdTechniques.push(saved);
-        console.log(`✅ Default technique created: ${saved.name}`);
+        console.log(`Default technique created: ${saved.name}`);
       }
     }
 

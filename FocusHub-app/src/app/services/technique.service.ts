@@ -225,7 +225,7 @@ fetchTechniques(): Observable<Technique[]> {
     return this.http.post<any>(`${this.sessionsUrl}`, sessionData, this.getHeaders()).pipe(
       tap((session) => {
         this.currentFocusSessionId.set(session.id);
-        console.log('✅ Focus session created:', session);
+        console.log('Focus session created:', session);
       })
     );
   }
@@ -234,7 +234,7 @@ fetchTechniques(): Observable<Technique[]> {
     return this.http.get<any>(`${this.sessionsUrl}/active/${userId}`, this.getHeaders()).pipe(
       tap((session) => {
         this.currentFocusSessionId.set(session.id);
-        console.log('✅ Active focus session retrieved:', session);
+        console.log('Active focus session retrieved:', session);
       }),
       catchError((error) => {
         console.warn('No active focus session found:', error);
@@ -246,7 +246,7 @@ fetchTechniques(): Observable<Technique[]> {
   updateFocusSessionStatus(sessionId: number, status: 'in_progress' | 'paused' | 'completed'): Observable<any> {
     return this.http.patch<any>(`${this.sessionsUrl}/${sessionId}`, { status }, this.getHeaders()).pipe(
       tap((session) => {
-        console.log(`✅ Focus session updated to ${status}:`, session);
+        console.log(`Focus session updated to ${status}:`, session);
       })
     );
   }
@@ -254,7 +254,7 @@ fetchTechniques(): Observable<Technique[]> {
   addTaskToFocusSession(focusSessionId: number, taskId: number): Observable<any> {
     return this.http.post<any>(`${this.sessionTasksUrl}`, { focusSessionId, taskId }, this.getHeaders()).pipe(
       tap((focusSessionTask) => {
-        console.log('✅ Task added to focus session:', focusSessionTask);
+        console.log('Task added to focus session:', focusSessionTask);
       })
     );
   }
@@ -262,7 +262,7 @@ fetchTechniques(): Observable<Technique[]> {
   removeTaskFromFocusSession(focusSessionId: number, taskId: number): Observable<any> {
     return this.http.delete<any>(`${this.sessionsUrl}/${focusSessionId}/tasks/${taskId}`, this.getHeaders()).pipe(
       tap(() => {
-        console.log(`✅ Task ${taskId} removed from focus session ${focusSessionId}`);
+        console.log(`Task ${taskId} removed from focus session ${focusSessionId}`);
       })
     );
   }

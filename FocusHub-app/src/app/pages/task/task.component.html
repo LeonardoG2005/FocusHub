@@ -48,7 +48,7 @@
                         <input type="checkbox" [checked]="task.status === 'completed'" (change)="toggleComplete(task.id)">
                         <span (click)="openTaskDetails(task)">{{ task.title }}</span>
                         <span class="task-date">
-                            ⚠️ {{ task.dueDate | date:'shortDate' }}
+                            {{ task.dueDate | date:'shortDate' }}
                         </span>
                     </div>
                 </li>

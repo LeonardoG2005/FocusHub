@@ -23,24 +23,24 @@ class TCPTransport extends Transport {
 
   private connectToLogstash() {
     this.client = net.connect({ host: this.logstashHost, port: this.logstashPort }, () => {
-      console.log(`🟢 Conectado a Logstash en ${this.logstashHost}:${this.logstashPort}`);
+      console.log(`Conectado a Logstash en ${this.logstashHost}:${this.logstashPort}`);
       this.reconnectAttempts = 0;
     });
 
     this.client.on('error', (err: Error) => {
-      console.error(`🔴 Error al conectar con Logstash: ${err.message}`);
+      console.error(`Error al conectar con Logstash: ${err.message}`);
 
       if (this.reconnectAttempts < this.maxReconnectAttempts) {
         this.reconnectAttempts++;
-        console.log(`🔁 Reintentando conexión (${this.reconnectAttempts}/${this.maxReconnectAttempts}) en ${this.reconnectDelay}ms...`);
+        console.log(`Reintentando conexión (${this.reconnectAttempts}/${this.maxReconnectAttempts}) en ${this.reconnectDelay}ms...`);
         setTimeout(() => this.connectToLogstash(), this.reconnectDelay);
       } else {
-        console.error('❌ Se alcanzó el número máximo de reintentos para conectar a Logstash.');
+        console.error('Se alcanzó el número máximo de reintentos para conectar a Logstash.');
       }
     });
 
     this.client.on('close', () => {
-      console.warn('🔌 Conexión con Logstash cerrada.');
+      console.warn('Conexión con Logstash cerrada.');
     });
   }
 
@@ -51,7 +51,7 @@ class TCPTransport extends Transport {
       try {
         this.client.write(JSON.stringify(info) + '\n');
       } catch (e) {
-        console.error('❗ Error al escribir en el socket TCP:', e.message);
+        console.error('Error al escribir en el socket TCP:', e.message);
       }
     }
 
