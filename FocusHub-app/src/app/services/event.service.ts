@@ -3,6 +3,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { TokenService } from './token.service';
 import { CalendarEvent } from '../shared/interfaces/calendar-event.interface';
 import { tap } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
@@ -10,7 +11,7 @@ import { tap } from 'rxjs';
 export class EventService {
   public events = signal<CalendarEvent[]>([]); // Signal reactiva
 
-  private readonly baseUrl = 'http://localhost:3000/events';
+  private readonly baseUrl = `${environment.apiUrl}/events`;
   private http = inject(HttpClient);
   private tokenService = inject(TokenService);
 

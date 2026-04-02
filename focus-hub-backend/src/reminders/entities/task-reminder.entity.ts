@@ -7,14 +7,14 @@ export class TaskReminder {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'datetime', nullable: false })
+  @Column({ type: 'timestamp', nullable: false })
   reminderTime: Date;
 
   @Column({ type: 'varchar', length: 50, default: 'push' })
   notificationType: 'push' | 'desktop';
 
-  @Column({ type: 'tinyint', default: 1 })
-  status: number;
+  @Column({ type: 'boolean', default: true })
+  status: boolean;
 
   @OneToOne(() => Task, (task) => task.taskReminder, { nullable: false, onDelete: 'CASCADE' })
   @JoinColumn({ name: 'task_id' })

@@ -10,7 +10,7 @@ import { RemindersModule } from './reminders/reminders.module';
 import { ProductivityModule } from './productivity/productivity.module';
 import { TasksModule } from './tasks/tasks.module';
 import { AuthModule } from './auth/auth.module';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { User } from './users/user.entity';
 import { Task } from './tasks/task.entity';
 import { Category } from './categories/category.entity';
@@ -27,12 +27,44 @@ import { FocusSessionTask } from './productivity/entities/focus-session-task.ent
   imports: [ConfigModule.forRoot({
       isGlobal: true,
     }),
-    TypeOrmModule.forRoot({
-      type: 'sqlite',
-      database: 'focushub.db',
-      entities: [User, Task, Category, Event, AmbientSound, TaskReminder, EventReminder, Technique, FocusSession, FocusSessionTask],
-      synchronize: true,
-      logging: true,
+    TypeOrmModule.forRootAsync({
+      inject: [ConfigService],
+      useFactory: (configService: ConfigService) => {
+        const databaseUrl = configService.get<string>('DATABASE_URL');
+        const dbType = configService.get<string>('DB_TYPE', 'sqlite');
+        const synchronize = configService.get<string>('DB_SYNCHRONIZE', 'true') === 'true';
+        const logging = configService.get<string>('DB_LOGGING', 'true') === 'true';
+        const entities = [User, Task, Category, Event, AmbientSound, TaskReminder, EventReminder, Technique, FocusSession, FocusSessionTask];
+
+        if (dbType === 'postgres' || !!databaseUrl) {
+          const dbSslEnabled = configService.get<string>('DB_SSL', 'true') === 'true';
+
+          return {
+            type: 'postgres' as const,
+            ...(databaseUrl
+              ? { url: databaseUrl }
+              : {
+                  host: configService.get<string>('DB_HOST', 'localhost'),
+                  port: Number(configService.get<string>('DB_PORT', '5432')),
+                  username: configService.get<string>('DB_USERNAME', 'postgres'),
+                  password: configService.get<string>('DB_PASSWORD', ''),
+                  database: configService.get<string>('DB_NAME', 'focushub'),
+                }),
+            ssl: dbSslEnabled ? { rejectUnauthorized: false } : false,
+            entities,
+            synchronize,
+            logging,
+          };
+        }
+
+        return {
+          type: 'sqlite' as const,
+          database: configService.get<string>('SQLITE_PATH', 'focushub.db'),
+          entities,
+          synchronize,
+          logging,
+        };
+      },
     }),
     UsersModule,
     AmbientSoundModule,

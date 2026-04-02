@@ -6,13 +6,13 @@ export class EventReminder {
   @PrimaryGeneratedColumn()
   id: number;
 
-  @Column({ type: 'datetime', nullable: false })
+  @Column({ type: 'timestamp', nullable: false })
   reminderTime: Date;
 
   @Column({ type: 'varchar', length: 50, default: 'push', nullable: false })
   notificationType: 'push' | 'desktop';
 
-  @Column({ type: 'tinyint', default: 1, nullable: false })
+  @Column({ type: 'boolean', default: true, nullable: false })
   status: boolean;
 
 

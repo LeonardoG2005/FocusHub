@@ -15,10 +15,10 @@ export class Event {
   @Column({ type: 'text', nullable: true, default: null })
   description?: string;
 
-  @Column({ type: 'datetime', nullable: false })
+  @Column({ type: 'timestamp', nullable: false })
   startTime: Date;
 
-  @Column({ type: 'datetime', nullable: true, default: null })
+  @Column({ type: 'timestamp', nullable: true, default: null })
   endTime?: Date;
 
 

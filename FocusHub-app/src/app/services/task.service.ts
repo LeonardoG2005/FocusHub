@@ -3,12 +3,13 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { map, tap } from 'rxjs/operators';
 import { Task } from '../shared/interfaces/task.interface';
 import { TokenService } from './token.service';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class TaskService {
-  private readonly apiUrl = 'http://localhost:3000/tasks';
+  private readonly apiUrl = `${environment.apiUrl}/tasks`;
   private readonly http = inject(HttpClient);
   private readonly tokenService = inject(TokenService);
 

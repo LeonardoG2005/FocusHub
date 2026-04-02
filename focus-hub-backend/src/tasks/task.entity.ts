@@ -17,7 +17,7 @@ export class Task {
   @Column({ type: 'text', nullable: true })
   description?: string;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   dueDate?: Date;
 
   @Column({ type: 'varchar', length: 50, default: 'medium' })

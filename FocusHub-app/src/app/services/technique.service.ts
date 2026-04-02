@@ -3,6 +3,7 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { Technique } from '../shared/interfaces/technique.interface';
 import { TokenService } from './token.service';
 import { Observable, forkJoin, of, tap, catchError, map } from 'rxjs';
+import { environment } from '../../environments/environment';
 
 export type TimerMode = 'work' | 'shortBreak' | 'longBreak';
 
@@ -33,9 +34,9 @@ export class TechniqueService {
     lastUpdatedAt: Date.now(),
   });
 
-  private readonly baseUrl = 'http://localhost:3000/productivity/techniques';
-  private readonly sessionsUrl = 'http://localhost:3000/productivity/focus-sessions';
-  private readonly sessionTasksUrl = 'http://localhost:3000/productivity/focus-session-tasks';
+  private readonly baseUrl = `${environment.apiUrl}/productivity/techniques`;
+  private readonly sessionsUrl = `${environment.apiUrl}/productivity/focus-sessions`;
+  private readonly sessionTasksUrl = `${environment.apiUrl}/productivity/focus-session-tasks`;
   private readonly techniquesStateKey = 'focushub-techniques-state';
   private http = inject(HttpClient);
   private tokenService = inject(TokenService);

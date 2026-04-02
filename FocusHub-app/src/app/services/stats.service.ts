@@ -3,12 +3,13 @@ import { HttpClient, HttpHeaders } from '@angular/common/http';
 import { map, catchError } from 'rxjs/operators';
 import { of } from 'rxjs';
 import { TokenService } from './token.service';
+import { environment } from '../../environments/environment';
 
 @Injectable({
   providedIn: 'root'
 })
 export class StatsService {
-  private readonly apiUrl = 'http://localhost:3000/productivity/stats'; 
+  private readonly apiUrl = `${environment.apiUrl}/productivity/stats`;
   private readonly http = inject(HttpClient);
   private readonly tokenService = inject(TokenService);
 

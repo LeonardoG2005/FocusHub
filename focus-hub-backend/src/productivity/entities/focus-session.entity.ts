@@ -22,7 +22,7 @@ export class FocusSession {
   @Column({ type: 'int', default: 0, nullable: false })
   elapsedSeconds: number = 0;
 
-  @Column({ type: 'datetime', nullable: true })
+  @Column({ type: 'timestamp', nullable: true })
   pausedAt?: Date;
 
   @CreateDateColumn()
