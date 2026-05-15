@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy, AfterViewInit, ElementRef, ViewChild, Renderer2, inject,signal, WritableSignal, effect } from '@angular/core';
+import { Component, OnInit, OnDestroy, AfterViewInit, ElementRef, ViewChild, Renderer2, inject, signal, computed, WritableSignal, effect, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { interval, Subscription } from 'rxjs';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
@@ -8,6 +8,7 @@ import { Task } from '../../shared/interfaces/task.interface';
 import { TechniqueService } from '../../services/technique.service';
 import { TaskService } from '../../services/task.service';
 import { TokenService } from '../../services/token.service';
+import Swal from 'sweetalert2';
 
 @Component({
   selector: 'app-techniques',
@@ -28,6 +29,10 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
     longBreak: 0,
   };
 
+  selectedTechniqueName: string = '';
+
+  isTechniqueDropdownOpen: boolean = false;
+
   currentMode: 'work' | 'shortBreak' | 'longBreak' = 'work';
 
   timerIntervalSubscription: Subscription | null = null;
@@ -39,9 +44,17 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
   isNewTechniqueModalVisible = signal(false);
   activeTabIndex = signal(0);
   timeLeft = signal(this.currentTechnique.workTime);
-  sessionTasks = signal<Task[]>([]);
+  sessionTasks = computed<Task[]>(() => {
+    const ids = this.techniqueService.techniquesUiState().sessionTaskIds ?? [];
+    if (!ids.length) return [];
+
+    const tasks = this.taskService.tasks();
+    const byId = new Map<number, Task>(tasks.map((t) => [t.id, t]));
+    return ids.map((id) => byId.get(id)).filter((t): t is Task => !!t);
+  });
   focusSessionStatus: 'in_progress' | 'paused' | 'completed' | null = null;
   private restoredFromActiveSession = false;
+  private audioContext: AudioContext | null = null;
 
   fb = inject(FormBuilder);
 
@@ -62,7 +75,7 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
 
   @ViewChild('timerDisplay') timerDisplay!: ElementRef;
   @ViewChild('timerCircle') timerCircle!: ElementRef;
-  @ViewChild('techniqueSelect') techniqueSelect!: ElementRef;
+  @ViewChild('techniqueDropdown') techniqueDropdown!: ElementRef;
   @ViewChild('newTechniqueModal') newTechniqueModal!: ElementRef;
   @ViewChild('newTechniqueFormElement') newTechniqueFormElement!: ElementRef;
   @ViewChild('floatingTimer') floatingTimer!: ElementRef;
@@ -85,6 +98,22 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
       const list = this.techniqueService.techniques();
       if (!list || list.length === 0) return;
 
+      // If we already restored an active backend session, keep that technique/time
+      // and only sync the dropdown selection against the fetched list.
+      if (this.restoredFromActiveSession) {
+        const activeName = this.currentTechnique?.name;
+        const match = activeName ? list.find((t) => t.name === activeName) : undefined;
+        if (match) {
+          this.currentTechnique = match;
+        }
+        this.selectedTechniqueName = this.currentTechnique.name;
+        this.techniqueService.setSelectedTechnique(this.currentTechnique.name);
+        this.persistUiState();
+        this.updateTimerDisplay();
+        this.updateProgressCircle();
+        return;
+      }
+
       const persistedName = this.techniqueService.techniquesUiState().selectedTechniqueName;
       const persistedTechnique = persistedName
         ? list.find((t) => t.name === persistedName)
@@ -92,10 +121,15 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
       const pomodoro = list.find((t) => t.name.toLowerCase().includes('pomodoro'));
 
       this.currentTechnique = persistedTechnique || pomodoro || list[0];
+      this.selectedTechniqueName = this.currentTechnique.name;
 
       if (!this.restoredFromActiveSession) {
         const totalForMode = this.getTotalSecondsForMode(this.currentMode);
-        const initialTime = persistedState.timeLeft > 0 ? persistedState.timeLeft : totalForMode;
+        // Only restore a leftover time when the timer is actually running.
+        // Otherwise, show the full duration for the selected technique/mode.
+        const shouldRestoreTime = !!persistedState.isRunning;
+        const restored = shouldRestoreTime && persistedState.timeLeft > 0 ? persistedState.timeLeft : totalForMode;
+        const initialTime = totalForMode > 0 ? Math.min(restored, totalForMode) : restored;
         this.timeLeft.set(initialTime);
 
         // Fallback: if backend has no active session (e.g. break mode), continue local timer.
@@ -118,11 +152,12 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
       this.techniqueService.getActiveFocusSession(userId).subscribe({
         next: (session) => {
           if (session) {
-            console.log('✅ Active session found:', session);
+            console.log('Active session found:', session);
             // Restore the timer with elapsed time
             const technique = session.technique;
             this.currentTechnique = technique;
             this.restoredFromActiveSession = true;
+            this.selectedTechniqueName = this.currentTechnique.name;
             
             // Calculate remaining time: workTime - elapsedSeconds
             const remainingSeconds = technique.workTime - session.elapsedSeconds;
@@ -139,13 +174,134 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
             this.updateTimerDisplay();
             this.updateProgressCircle();
             
-            console.log(`⏱️ Session restored. Elapsed: ${session.elapsedSeconds}s, Remaining: ${remainingSeconds}s`);
+            console.log(`Session restored. Elapsed: ${session.elapsedSeconds}s, Remaining: ${remainingSeconds}s`);
+
+            // Restore session tasks (if backend includes them).
+            const idsFromBackend = Array.isArray(session.focusSessionTasks)
+              ? session.focusSessionTasks
+                  .map((fst: any) => fst?.task?.id ?? fst?.taskId)
+                  .filter((id: any) => typeof id === 'number')
+              : [];
+            if (idsFromBackend.length > 0) {
+              this.setSessionTaskIds(Array.from(new Set(idsFromBackend)));
+            }
           }
         },
         error: (err) => {
           console.log('No active session or error retrieving it:', err);
         }
       });
+    }
+  }
+
+  changeTechniqueByName(name: string): void {
+    const technique = this.techniqueService.getTechnique(name);
+    if (!technique) return;
+    this.changeTechniqueInternal(technique);
+  }
+
+  toggleTechniqueDropdown(): void {
+    this.isTechniqueDropdownOpen = !this.isTechniqueDropdownOpen;
+  }
+
+  selectTechniqueFromDropdown(name: string): void {
+    this.isTechniqueDropdownOpen = false;
+    this.changeTechniqueByName(name);
+  }
+
+  isDeleteTechniqueDisabled(_name: string): boolean {
+    const hasActiveFocusSession = this.techniqueService.currentFocusSessionId() !== null;
+    return this.isRunning || hasActiveFocusSession || this.restoredFromActiveSession;
+  }
+
+  confirmDeleteTechnique(technique: Technique, event: MouseEvent): void {
+    event.stopPropagation();
+
+    if (this.isDeleteTechniqueDisabled(technique.name)) {
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'info',
+        title: 'No disponible',
+        text: 'No puedes eliminar técnicas mientras hay una sesión activa.',
+        showConfirmButton: false,
+        timer: 2600,
+        timerProgressBar: true,
+      });
+      return;
+    }
+
+    Swal.fire({
+      title: 'Eliminar técnica',
+      text: `¿Seguro que deseas eliminar "${technique.name}"? Esta acción no se puede deshacer.`,
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonText: 'Eliminar',
+      cancelButtonText: 'Cancelar',
+      reverseButtons: true,
+    }).then((result) => {
+      if (!result.isConfirmed) return;
+
+      this.techniqueService.deleteTechnique(technique.name).subscribe({
+        next: () => {
+          this.isTechniqueDropdownOpen = false;
+
+          // If we just deleted the current technique, switch to a safe fallback.
+          if (this.currentTechnique?.name === technique.name) {
+            const updated = this.techniqueService.techniques();
+            const fallback = updated.find((t) => t.name !== technique.name) || updated[0];
+            if (fallback) {
+              this.changeTechniqueInternal(fallback);
+            } else {
+              this.currentTechnique = { name: '', workTime: 0, shortBreak: 0, longBreak: 0 };
+              this.selectedTechniqueName = '';
+              this.timeLeft.set(0);
+              this.persistUiState();
+              this.updateTimerDisplay();
+              this.updateProgressCircle();
+            }
+          }
+
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: 'Técnica eliminada',
+            text: `"${technique.name}" fue eliminada.` ,
+            showConfirmButton: false,
+            timer: 2400,
+            timerProgressBar: true,
+          });
+        },
+        error: (err) => {
+          console.error('Error deleting technique:', err);
+
+          const status = (err as any)?.status;
+          const friendly =
+            status === 403
+              ? 'No tienes permisos para eliminar esta técnica.'
+              : status === 404
+                ? 'La técnica ya no existe o fue eliminada.'
+                : 'Ocurrió un error al eliminar la técnica. Intenta nuevamente.';
+
+          Swal.fire({
+            title: 'No se pudo eliminar',
+            text: friendly,
+            icon: 'error',
+            confirmButtonText: 'Aceptar',
+          });
+        }
+      });
+    });
+  }
+
+  @HostListener('document:click', ['$event'])
+  onDocumentClick(event: MouseEvent): void {
+    if (!this.isTechniqueDropdownOpen) return;
+    const targetNode = event.target as Node | null;
+    if (!targetNode) return;
+    if (this.techniqueDropdown?.nativeElement && !this.techniqueDropdown.nativeElement.contains(targetNode)) {
+      this.isTechniqueDropdownOpen = false;
     }
   }
 
@@ -202,6 +358,7 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
 
   startTimer(): void {
     if (this.isRunning) return;
+    this.ensureAudioReady();
     this.isRunning = true;
     // Only create or resume a focus session when in 'work' mode
     if (this.currentMode !== 'work') {
@@ -229,13 +386,13 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
 
           // If there were tasks added locally before the session was created,
           // persist those relations in the backend now.
-          const localSessionTasks = this.sessionTasks();
-          if (localSessionTasks && localSessionTasks.length > 0 && session && session.id) {
-            console.log('Linking pre-added tasks to new session:', session.id, localSessionTasks.map(t => t.id));
-            localSessionTasks.forEach(t => {
-              this.techniqueService.addTaskToFocusSession(session.id, t.id).subscribe({
-                next: () => console.log(`Linked task ${t.id} to session ${session.id}`),
-                error: (err) => console.error(`Error linking task ${t.id} to session ${session.id}:`, err)
+          const localSessionTaskIds = this.getSessionTaskIds();
+          if (localSessionTaskIds.length > 0 && session && session.id) {
+            console.log('Linking pre-added tasks to new session:', session.id, localSessionTaskIds);
+            localSessionTaskIds.forEach((taskId) => {
+              this.techniqueService.addTaskToFocusSession(session.id, taskId).subscribe({
+                next: () => console.log(`Linked task ${taskId} to session ${session.id}`),
+                error: (err) => console.error(`Error linking task ${taskId} to session ${session.id}:`, err)
               });
             });
           }
@@ -299,7 +456,7 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
         next: () => {
           this.focusSessionStatus = 'completed';
           this.techniqueService.currentFocusSessionId.set(null);
-          this.sessionTasks.set([]);
+          this.setSessionTaskIds([]);
           console.log('Session completed');
         },
         error: (err) => console.error('Error completing session:', err)
@@ -400,11 +557,9 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  changeTechnique(event: Event): void {
-    const selectedValue = (event.target as HTMLSelectElement).value;
-    const technique = this.techniqueService.getTechnique(selectedValue);
-    if (!technique) return;
+  private changeTechniqueInternal(technique: Technique): void {
     this.currentTechnique = technique;
+    this.selectedTechniqueName = technique.name;
     this.techniqueService.setSelectedTechnique(technique.name);
     this.currentMode = 'work';
     this.timeLeft.set(this.currentTechnique.workTime);
@@ -430,26 +585,53 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
       // Send the form data directly to the service - it expects the backend DTO format
       this.techniqueService.addTechnique(formValue).subscribe({
         next: (createdTechnique) => {
-          // Service updates signals; just set currentTechnique to created one
-          this.currentTechnique = createdTechnique;
-          this.techniqueService.setSelectedTechnique(createdTechnique.name);
-          this.currentMode = 'work';
-          this.timeLeft.set(this.currentTechnique.workTime);
-          this.persistUiState();
-          this.updateTimerDisplay();
-          this.updateProgressCircle();
-          this.setActiveTab(0);
+          // If there is an active/running session, do NOT switch technique or reset the timer.
+          const hasActiveFocusSession = this.techniqueService.currentFocusSessionId() !== null;
+          const shouldKeepCurrent = this.isRunning || hasActiveFocusSession || this.restoredFromActiveSession;
+
+          if (!shouldKeepCurrent) {
+            this.currentTechnique = createdTechnique;
+            this.selectedTechniqueName = createdTechnique.name;
+            this.techniqueService.setSelectedTechnique(createdTechnique.name);
+            this.currentMode = 'work';
+            this.timeLeft.set(this.currentTechnique.workTime);
+            this.persistUiState();
+            this.updateTimerDisplay();
+            this.updateProgressCircle();
+            this.setActiveTab(0);
+          }
+
           this.isNewTechniqueModalVisible.set(false);
           this.newTechniqueForm.reset();
-          alert(`Técnica "${createdTechnique.name}" creada con éxito.`);
+
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: 'Técnica creada',
+            text: `"${createdTechnique.name}" ya aparece en la lista.`,
+            showConfirmButton: false,
+            timer: 2500,
+            timerProgressBar: true,
+          });
         },
         error: (err) => {
           console.error('Error al crear técnica', err);
-          alert('Error al guardar la técnica. Intenta de nuevo.');
+          Swal.fire({
+            title: 'Error',
+            text: 'Error al guardar la técnica. Intenta de nuevo.',
+            icon: 'error',
+            confirmButtonText: 'Aceptar',
+          });
         }
       });
     } else {
-      alert('Por favor, completa todos los campos requeridos correctamente.');
+      Swal.fire({
+        title: 'Formulario inválido',
+        text: 'Completa todos los campos requeridos correctamente.',
+        icon: 'warning',
+        confirmButtonText: 'Aceptar',
+      });
     }
   }
 
@@ -458,8 +640,76 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   playNotificationSound(): void {
-    console.log('¡Tiempo terminado!');
+    const isWork = this.currentMode === 'work';
+    const title = isWork ? '¡Sesión finalizada!' : '¡Descanso terminado!';
+    const text = isWork
+      ? 'Buen trabajo. Es momento de descansar.'
+      : 'Listo. Volvamos a concentrarnos.';
 
+    Swal.fire({
+      toast: true,
+      position: 'top-end',
+      icon: 'info',
+      title,
+      text,
+      showConfirmButton: false,
+      timer: 3500,
+      timerProgressBar: true,
+    });
+
+    this.playAlarmBeep();
+
+    if (typeof navigator !== 'undefined' && 'vibrate' in navigator) {
+      try {
+        navigator.vibrate([150, 80, 150]);
+      } catch {
+        // ignore
+      }
+    }
+
+  }
+
+  private ensureAudioReady(): void {
+    const AnyWindow = window as any;
+    const AudioCtx = window.AudioContext || AnyWindow.webkitAudioContext;
+    if (!AudioCtx) return;
+
+    if (!this.audioContext) {
+      this.audioContext = new AudioCtx();
+    }
+
+    if (this.audioContext.state === 'suspended') {
+      void this.audioContext.resume().catch(() => undefined);
+    }
+  }
+
+  private playAlarmBeep(): void {
+    this.ensureAudioReady();
+    const ctx = this.audioContext;
+    if (!ctx) return;
+
+    const beepOnce = (startAt: number) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+
+      osc.type = 'sine';
+      osc.frequency.value = 880;
+
+      gain.gain.setValueAtTime(0.0001, startAt);
+      gain.gain.exponentialRampToValueAtTime(0.12, startAt + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, startAt + 0.25);
+
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(startAt);
+      osc.stop(startAt + 0.28);
+    };
+
+    const now = ctx.currentTime;
+    beepOnce(now);
+    beepOnce(now + 0.35);
+    beepOnce(now + 0.70);
   }
 
   startFloatingTimer(): void {
@@ -488,65 +738,63 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
       console.warn('Cannot add tasks during break mode:', this.currentMode);
       return;
     }
-    const current = this.sessionTasks();
-    const taskAlreadyInSession = current.find(t => t.id === task.id);
+    const currentIds = this.getSessionTaskIds();
+    const taskAlreadyInSession = currentIds.includes(task.id);
 
-    console.log('🔵 addTaskToSession called for task:', task.title, 'ID:', task.id);
+    console.log('addTaskToSession called for task:', task.title, 'ID:', task.id);
     console.log('   Task already in session?', !!taskAlreadyInSession);
     console.log('   Current session ID:', this.techniqueService.currentFocusSessionId());
     console.log('   Is running?', this.isRunning);
 
     if (!taskAlreadyInSession) {
-      // Add to local state
-      this.sessionTasks.set([...current, task]);
-      console.log('✅ Task added to sessionTasks signal');
+      // Persist only IDs so state survives route changes.
+      this.setSessionTaskIds([...currentIds, task.id]);
+      console.log('Task added to persisted sessionTaskIds');
 
       // Add task to focus session in backend if session exists
       const sessionId = this.techniqueService.currentFocusSessionId();
       if (sessionId) {
-        console.log('📤 Posting to addTaskToFocusSession with sessionId:', sessionId);
+        console.log('Posting to addTaskToFocusSession with sessionId:', sessionId);
         this.techniqueService.addTaskToFocusSession(sessionId, task.id).subscribe({
           next: () => {
-            console.log('✅ Task added to focus session on backend');
+            console.log('Task added to focus session on backend');
           },
           error: (err) => {
-            console.error('❌ Error adding task to focus session:', err);
-            // Remove from local state if failed
-            this.removeTaskFromSession(task.id);
+            console.error('Error adding task to focus session:', err);
+            // Revert persisted state if failed
+            this.removeTaskIdFromSessionLocal(task.id);
           }
         });
       } else {
-        console.log('⚠️ No active session - task added locally only');
+        console.log('No active session - task added locally only');
       }
     } else {
-      console.log('⚠️ Task already in session');
+      console.log('Task already in session');
     }
   }
 
   removeTaskFromSession(taskId: number): void {
-    console.log('🔴 removeTaskFromSession called with taskId:', taskId);
+    console.log('removeTaskFromSession called with taskId:', taskId);
     const sessionId = this.techniqueService.currentFocusSessionId();
     console.log('   Current session ID:', sessionId);
 
     // If session exists, delete from backend first
     if (sessionId) {
-      console.log('📤 Posting DELETE to removeTaskFromFocusSession...');
+      console.log('Posting DELETE to removeTaskFromFocusSession...');
       this.techniqueService.removeTaskFromFocusSession(sessionId, taskId).subscribe({
         next: () => {
-          // Only remove from local state if API call succeeds
-          console.log('✅ Task removed from backend, now removing from local state');
-          const current = this.sessionTasks();
-          this.sessionTasks.set(current.filter(t => t.id !== taskId));
+          // Only remove from persisted state if API call succeeds
+          console.log('Task removed from backend, now removing from persisted state');
+          this.removeTaskIdFromSessionLocal(taskId);
         },
         error: (err) => {
-          console.error('❌ Error removing task from focus session:', err);
+          console.error('Error removing task from focus session:', err);
         }
       });
     } else {
       // No session, just remove from local state
-      console.log('⚠️ No active session, removing from local state only');
-      const current = this.sessionTasks();
-      this.sessionTasks.set(current.filter(t => t.id !== taskId));
+      console.log('No active session, removing from local state only');
+      this.removeTaskIdFromSessionLocal(taskId);
     }
   }
 
@@ -554,17 +802,24 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!this.isRunning) return; // Only allow if session is active
     // Toggle completion status via TaskService
     this.taskService.toggleComplete(task);
-
-    // If the task was pending and user marked it completed, remove it from the
-    // local sessionTasks list so it no longer appears in the session UI.
-    if (task.status !== 'completed') {
-      const current = this.sessionTasks();
-      this.sessionTasks.set(current.filter(t => t.id !== task.id));
-    }
   }
 
   isTaskInSession(taskId: number): boolean {
-    return this.sessionTasks().some(t => t.id === taskId);
+    return this.getSessionTaskIds().includes(taskId);
+  }
+
+  private getSessionTaskIds(): number[] {
+    return this.techniqueService.techniquesUiState().sessionTaskIds ?? [];
+  }
+
+  private setSessionTaskIds(ids: number[]): void {
+    this.techniqueService.updateTechniquesUiState({ sessionTaskIds: ids });
+  }
+
+  private removeTaskIdFromSessionLocal(taskId: number): void {
+    const currentIds = this.getSessionTaskIds();
+    if (!currentIds.includes(taskId)) return;
+    this.setSessionTaskIds(currentIds.filter((id) => id !== taskId));
   }
 
   private getTotalSecondsForMode(mode: 'work' | 'shortBreak' | 'longBreak'): number {

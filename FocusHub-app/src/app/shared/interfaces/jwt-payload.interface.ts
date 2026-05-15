@@ -1,5 +1,5 @@
 export interface JwtPayload {
-  sub: number;         // ✅ Este es el userId real
+  sub: number;         // Este es el userId real
   email: string;
   exp: number;
   iat?: number;

@@ -1,4 +1,12 @@
 <div class="nav-shortcuts">
+    <div class="nav-user">
+        <i class="fa-solid fa-circle-user nav-user-icon" aria-hidden="true"></i>
+        <div class="nav-user-text">
+            <div class="nav-user-name">{{ authService.getCurrentUserName() || 'Usuario' }}</div>
+            <div class="nav-user-email">{{ authService.getCurrentUserEmail() || '' }}</div>
+        </div>
+    </div>
+
     <a [routerLink]="['/tasks']" routerLinkActive="active"> Tareas</a>
     <a [routerLink]="['/calendar']" routerLinkActive="active"> Calendario</a>
     <a [routerLink]="['/techniques']" routerLinkActive="active"> Tecnicas</a>

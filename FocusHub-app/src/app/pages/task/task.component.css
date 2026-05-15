@@ -203,6 +203,9 @@ h2 {
   cursor: pointer;
   font-size: 14px;
   padding: 5px 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 
 .task-details-panel {

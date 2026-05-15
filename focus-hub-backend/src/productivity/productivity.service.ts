@@ -59,8 +59,16 @@ export class ProductivityService {
   }
 
   async findOneTechniqueByName(name:string, userId: number): Promise<Technique> {
-    const technique = await this.techniqueRepository.findOne({ where: { name, user: { name: name } } });
-    if (!technique) throw new NotFoundException(`Technique with ID ${name} not found`);
+    const normalizedName = (name ?? '').toLowerCase();
+
+    const technique = await this.techniqueRepository.findOne({
+      where: { name: normalizedName, user: { id: userId } },
+    });
+
+    if (!technique) {
+      throw new NotFoundException(`Technique with name '${normalizedName}' not found`);
+    }
+
     return technique;
   }
 
@@ -146,7 +154,7 @@ export class ProductivityService {
   async findAllFocusSessions(userId: number): Promise<FocusSession[]> {
     return this.focusSessionRepository.find({
       where: { user: { id: userId } },
-      relations: ['technique', 'focusSessionTasks'],
+      relations: ['technique', 'focusSessionTasks', 'focusSessionTasks.task'],
       order: { createdAt: 'DESC' },
     });
   }
@@ -154,7 +162,7 @@ export class ProductivityService {
   async getActiveFocusSession(userId: number): Promise<FocusSession> {
     const focusSession = await this.focusSessionRepository.findOne({
       where: { user: { id: userId }, status: 'in_progress' },
-      relations: ['technique', 'focusSessionTasks'],
+      relations: ['technique', 'focusSessionTasks', 'focusSessionTasks.task'],
       order: { createdAt: 'DESC' },
     });
 
@@ -175,7 +183,7 @@ export class ProductivityService {
   async findOneFocusSession(id: number, userId: number): Promise<FocusSession> {
     const focusSession = await this.focusSessionRepository.findOne({
       where: { id, user: { id: userId } },
-      relations: ['technique', 'focusSessionTasks'],
+      relations: ['technique', 'focusSessionTasks', 'focusSessionTasks.task'],
     });
     if (!focusSession) throw new NotFoundException(`FocusSession with ID ${id} not found`);
     return focusSession;
@@ -190,6 +198,17 @@ export class ProductivityService {
       const newElapsed = Math.floor((now.getTime() - focusSession.createdAt.getTime()) / 1000) + focusSession.elapsedSeconds;
       focusSession.elapsedSeconds = newElapsed;
       focusSession.pausedAt = now;
+    }
+
+    // If status is being changed to completed, persist elapsed time as well.
+    if (updateFocusSessionDto.status === 'completed' && focusSession.status !== 'completed') {
+      if (focusSession.status === 'in_progress') {
+        const now = new Date();
+        const newElapsed = Math.floor((now.getTime() - focusSession.createdAt.getTime()) / 1000) + focusSession.elapsedSeconds;
+        focusSession.elapsedSeconds = newElapsed;
+      }
+      // If it was paused, elapsedSeconds is already accumulated.
+      focusSession.pausedAt = undefined;
     }
     
     // If status is being changed from paused to in_progress, reset createdAt to now for accurate tracking
@@ -315,7 +334,7 @@ export class ProductivityService {
         } as any);
         const saved: Technique = (await this.techniqueRepository.save(technique)) as unknown as Technique;
         createdTechniques.push(saved);
-        console.log(`✅ Default technique created: ${saved.name}`);
+        console.log(`Default technique created: ${saved.name}`);
       }
     }
 

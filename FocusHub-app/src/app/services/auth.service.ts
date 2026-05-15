@@ -6,6 +6,9 @@ import { User } from '../shared/interfaces/user.interface';
 import { environment } from '../../environments/environment';
 import { tap } from 'rxjs/operators';
 import { TokenService } from './token.service';
+import { TechniqueService } from './technique.service';
+
+const CURRENT_USER_KEY = 'current_user';
 
 @Injectable({
   providedIn: 'root'
@@ -14,7 +17,8 @@ export class AuthService {
   constructor(
     private http: HttpClient,
     private router: Router,
-    private tokenService: TokenService
+    private tokenService: TokenService,
+    private techniqueService: TechniqueService
   ) {}
 
   signUp(userData: User) {
@@ -22,19 +26,28 @@ export class AuthService {
   }
 
   logIn(credentials: { email: string; password: string }) {
-    return this.http.post<{ access_token: string; user: User }>(
+    return this.http.post<{ access_token: string; user: Pick<User, 'name' | 'email'> }>(
       `${environment.apiUrl}/auth/login`,
       credentials
     ).pipe(
       tap(response => {
         console.log(response)
         this.tokenService.setToken(response.access_token);
+
+        // Persist a safe subset for UI display.
+        const safeUser = {
+          name: response.user?.name ?? '',
+          email: response.user?.email ?? '',
+        };
+        localStorage.setItem(CURRENT_USER_KEY, JSON.stringify(safeUser));
       })
     );
   }
 
   logOut() {
     this.tokenService.clearToken();
+    this.techniqueService.resetTechniquesState();
+    localStorage.removeItem(CURRENT_USER_KEY);
     this.router.navigate(['/log-in']);
     Swal.fire({
       title: "Sesión cerrada",
@@ -42,6 +55,22 @@ export class AuthService {
       icon: "info",
       confirmButtonText: "Aceptar"
     });
+  }
+
+  getCurrentUserName(): string | null {
+    try {
+      const raw = localStorage.getItem(CURRENT_USER_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw) as { name?: string };
+      return parsed?.name?.trim() ? parsed.name.trim() : null;
+    } catch {
+      return null;
+    }
+  }
+
+  getCurrentUserEmail(): string | null {
+    const payload = this.tokenService.decodeToken();
+    return payload?.email ?? null;
   }
 
   isAuthenticated(): boolean {

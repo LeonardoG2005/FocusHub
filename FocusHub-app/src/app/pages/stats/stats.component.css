@@ -345,6 +345,12 @@
     font-size: 0.8rem;
 }
 
+.task-status i {
+    color: currentColor;
+    font-size: 0.75rem;
+    line-height: 1;
+}
+
 .task-name {
     flex: 1;
     color: var(--text-title);

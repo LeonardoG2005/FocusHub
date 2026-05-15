@@ -50,7 +50,7 @@
   <h2 class="card-title">Tiempo de Concentración</h2>
   <div class="concentration-stats">
     <div class="concentration-time">
-      <div class="time-number">{{ focusTimeToday }}h</div>
+      <div class="time-number">{{ focusTimeTodayLabel }}</div>
       <div class="time-label">Tiempo total hoy</div>
     </div> 
   </div>
@@ -127,16 +127,22 @@
       <div class="session-header" (click)="toggleSession(session)">
         <div>
           <div class="session-technique">{{ session.technique.name }}</div>
-          <div class="session-info">{{ session.createdAt ? (session.createdAt | date: 'dd/MM/yyyy, HH:mm') : 'Sin fecha' }} | {{session.status === 'completed' ? 'Completada' : 'En progreso' }} | {{ session.focusSessionTasks.length }} tareas</div>
+          <div class="session-info">{{ session.createdAt ? (session.createdAt | date: 'dd/MM/yyyy, HH:mm') : 'Sin fecha' }} | {{session.status === 'completed' ? 'Completada' : 'En progreso' }} | {{ getSessionDurationLabel(session) }} | {{ session.focusSessionTasks.length }} tareas</div>
         </div>
-        <div class="session-arrow" [style.transform]="session.expanded ? 'rotate(90deg)' : 'rotate(0deg)'">▶</div>
+        <div class="session-arrow" [style.transform]="session.expanded ? 'rotate(90deg)' : 'rotate(0deg)'">
+          <i class="fa-solid fa-chevron-right" aria-hidden="true"></i>
+        </div>
       </div>
       <div class="session-content" [class.active]="session.expanded">
         <div class="session-tasks">
           @for (task of session.focusSessionTasks; track $index) {
           <div class="task-item">
             <div class="task-status" [style.background]="task.task.status === 'completed' ? '#27ae60' : '#e74c3c'">
-              {{ task.task.status === 'completed' ? '✔' : '✗' }}
+              @if (task.task.status === 'completed') {
+                <i class="fa-solid fa-check" aria-hidden="true"></i>
+              } @else {
+                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+              }
             </div>
             <div class="task-name"> {{ task.task.title }} | {{ task.task.description ? task.task.description : 'Sin descripción'  }} </div>
             <div class="task-time">  {{ task.task.createdAt ? (task.task.createdAt | date: 'dd/MM/yyyy, HH:mm') : 'Sin fecha' }}</div>

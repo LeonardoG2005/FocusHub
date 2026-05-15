@@ -20,6 +20,43 @@
     gap: 10px; 
 }
 
+.nav-user {
+    width: 100%;
+    padding: 0 20px 10px 20px;
+    margin-bottom: 6px;
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.nav-user-icon {
+    font-size: 1.4rem;
+    color: var(--accent-color);
+    flex: 0 0 auto;
+}
+
+.nav-user-text {
+    min-width: 0;
+}
+
+.nav-user-name {
+    font-weight: 700;
+    color: var(--text-color);
+    font-size: 0.95em;
+    line-height: 1.2;
+}
+
+.nav-user-email {
+    font-weight: 500;
+    color: var(--tasks-label);
+    font-size: 0.8em;
+    line-height: 1.2;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
 
 .nav-shortcuts a {
     cursor: pointer;
@@ -103,6 +140,24 @@
         flex-wrap: wrap;
         position: fixed; /* Change to fixed for mobile too, to always be at the top */
         z-index: 1000; /* Ensure it stays on top of other content */
+    }
+
+    .nav-user {
+        width: auto;
+        padding: 0;
+        margin: 0;
+    }
+
+    .nav-user-email {
+        display: none;
+    }
+
+    .nav-user-name {
+        font-size: 0.85em;
+        max-width: 120px;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
     }
 
 

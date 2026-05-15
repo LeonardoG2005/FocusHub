@@ -1,60 +1,258 @@
-# 🧠 FocusHub
+# FocusHub
 
-FocusHub es una aplicación compuesta por un frontend en Angular y un backend en NestJS. Este repositorio está preparado para ejecutarse fácilmente usando Docker y Docker Compose.
+FocusHub es un monorepo con frontend Angular y backend NestJS para gestión de productividad.
+Incluye módulos de tareas, calendario, técnicas de concentración, sesiones de foco, estadísticas y autenticación JWT.
 
-Este proyecto utiliza:
-- Angular CLI: **19.2.6**
-- Node.js: **20.17.0**
-- NestJS: **11.0.1**
+## Estado actual (rama main)
 
----
+- Frontend: Angular 19 (standalone components + signals)
+- Backend: NestJS 11 + TypeORM
+- Base de datos configurada en código: SQLite local (archivo focushub.db)
+- Orquestación adicional disponible: Docker Compose con frontend, backend, MySQL y stack ELK
 
-## 🚀 ¿Cómo ejecutar el proyecto desde cero?
+## Estructura del repositorio
 
-### 📦 Requisitos previos
-
-Asegurarse de tener instalado Docker Desktop y luego abrirlo.
-
-Antes de comenzar, asegúrese de tener instalado lo siguiente:
-
-- Node.js y npm (recomendado: Node 20.17.0)
-- Angular CLI
-
-Puedes instalar Angular CLI con el siguiente comando:
-
-```bash
-npm install -g @angular/cli@19.2.6
-```
----
-
-### 🔁 Pasos para clonar y levantar la app
-
-1. **Clona el repositorio:**
-
-```bash
-git clone https://github.com/PholCast/FocusHub.git
-cd FocusHub
+```text
+FocusHub/
+	FocusHub-app/            # Frontend Angular
+	focus-hub-backend/       # Backend NestJS
+	elk/                     # Configuración ELK (Logstash)
+	docker-compose.yml       # Orquestación completa para desarrollo/demo
 ```
 
-2. **Instalar las dependencias del backend (NestJS)**
+## Arquitectura funcional
+
+### Frontend (FocusHub-app)
+
+Rutas principales:
+
+- / (welcome)
+- /sign-up
+- /log-in
+- /tasks (protegida)
+- /calendar (protegida)
+- /techniques (protegida)
+- /stats (protegida)
+
+Servicios clave:
+
+- AuthService: registro, login, logout y estado de autenticación
+- TokenService: gestión de JWT en localStorage
+- TaskService: CRUD de tareas y estado reactivo con signals
+- EventService: CRUD de eventos y filtrado por fecha
+- TechniqueService: técnicas globales/usuario, sesiones de foco, tareas por sesión y persistencia de estado UI en sessionStorage
+- StatsService: consumo de estadísticas de productividad
+
+Notas de frontend:
+
+- El interceptor global agrega Authorization: Bearer token cuando hay sesión.
+- La ruta /techniques integra temporizador de foco, restauración de sesión activa y asociación de tareas.
+- En main solo existe src/environments/environment.ts.
+
+### Backend (focus-hub-backend)
+
+Módulos:
+
+- auth
+- users
+- tasks
+- events
+- categories
+- productivity
+- ambient-sound
+- reminders (estructura base, sin endpoints funcionales expuestos)
+
+Configuración actual de base de datos (app.module.ts):
+
+- type: sqlite
+- database: focushub.db
+- synchronize: true
+- logging: true
+
+Documentación API:
+
+- Swagger disponible en /api
+
+## Endpoints principales
+
+### Autenticación
+
+- POST /auth/register
+- POST /auth/login
+
+### Usuarios
+
+- GET /users/me (requiere JWT)
+- POST /users
+- GET /users
+- GET /users/:id
+- PUT /users/:id
+- DELETE /users/:id
+
+### Tareas (requiere JWT)
+
+- POST /tasks
+- GET /tasks
+- GET /tasks/:id
+- PATCH /tasks/:id
+- PATCH /tasks/:id/status
+- DELETE /tasks/:id
+
+### Eventos (requiere JWT)
+
+- POST /events
+- GET /events
+- GET /events/:id
+- PUT /events/:id
+- DELETE /events/:id
+- GET /events/by-date?date=YYYY-MM-DD
+
+### Categorías
+
+- POST /categories?userId=
+- GET /categories?userId=
+- GET /categories/:id?userId=
+- PATCH /categories/:id?userId=
+- DELETE /categories/:id?userId=
+
+### Productividad (requiere JWT)
+
+Técnicas:
+
+- POST /productivity/techniques?userId=
+- GET /productivity/techniques?userId=
+- GET /productivity/techniques/global
+- GET /productivity/techniques/:name?userId=
+- PATCH /productivity/techniques/:name?userId=
+- DELETE /productivity/techniques/:name?userId=
+
+Sesiones de foco:
+
+- POST /productivity/focus-sessions
+- GET /productivity/focus-sessions?userId=
+- GET /productivity/focus-sessions/active/:userId
+- GET /productivity/focus-sessions/:id?userId=
+- PATCH /productivity/focus-sessions/:id?userId=
+- DELETE /productivity/focus-sessions/:id?userId=
+
+Relación sesión-tarea:
+
+- POST /productivity/focus-session-tasks
+- GET /productivity/focus-session-tasks
+- GET /productivity/focus-session-tasks/:id
+- PATCH /productivity/focus-session-tasks/:id
+- DELETE /productivity/focus-session-tasks/:id
+- DELETE /productivity/focus-sessions/:sessionId/tasks/:taskId
+
+Estadísticas:
+
+- GET /productivity/stats
+
+### Sonidos ambientales
+
+- GET /ambient-sounds
+- GET /ambient-sounds/:id
+- POST /ambient-sounds
+- PUT /ambient-sounds/:id
+- DELETE /ambient-sounds/:id
+
+## Requisitos
+
+- Node.js 20+
+- npm 10+
+- Docker Desktop (opcional, solo para flujo con contenedores)
+
+## Configuración de entorno
+
+En focus-hub-backend, crear un archivo .env para desarrollo local:
+
+```env
+JWT_SECRET=replace_with_secure_secret
+PORT=3000
+NODE_ENV=development
+LOGSTASH_HOST=localhost
+LOGSTASH_PORT=5000
+```
+
+Nota:
+
+- JWT_SECRET es obligatorio para que la estrategia JWT arranque correctamente.
+- Actualmente main.ts escucha en el puerto 3000 de forma fija.
+
+## Ejecución local (sin Docker)
+
+### 1) Backend
+
 ```bash
 cd focus-hub-backend
 npm install
-cd ..
+npm run start:dev
 ```
 
-3. **Levantar la aplicación con Docker Compose**
+Backend disponible en:
+
+- http://localhost:3000
+- Swagger: http://localhost:3000/api
+
+### 2) Frontend
+
 ```bash
-docker-compose up
+cd FocusHub-app
+npm install
+npm start
 ```
 
-El archivo docker-compose.yml ya usa las imágenes de Docker Hub subidas (https://hub.docker.com/repository/docker/pholcast25/focus-hub-angular/general y https://hub.docker.com/repository/docker/pholcast25/focus-hub-nest-js/general) y no requiere que se instale nada más.
+Frontend disponible en:
 
-Esto levanta los dos servicios de Frontend y Backend:
-📱 Frontend Angular en http://localhost:4200
+- http://localhost:4200
 
-🧠 Backend NestJS en http://localhost:3000
+## Ejecución con Docker Compose
 
-Además, puedes acceder a la documentación de la API (Swagger) en:
-http://localhost:3000/api
+```bash
+docker compose up
+```
+
+Servicios definidos en docker-compose.yml:
+
+- frontend: 4200
+- backend: 3000
+- mysql_db: 3307 (host) -> 3306 (container)
+- elasticsearch: 9200
+- logstash: 5000
+- kibana: 5601
+
+Nota:
+
+- El compose de la raíz usa imágenes publicadas en Docker Hub por defecto.
+- Las secciones build están comentadas en docker-compose.yml.
+
+## Scripts útiles
+
+### Backend
+
+```bash
+cd focus-hub-backend
+npm run build
+npm run start:dev
+npm run start:prod
+npm run lint
+npm run test
+npm run test:e2e
+```
+
+### Frontend
+
+```bash
+cd FocusHub-app
+npm start
+npm run build
+npm test
+```
+
+## Observaciones técnicas importantes
+
+1. En la rama main, el backend está configurado para SQLite en código, mientras que docker-compose también levanta MySQL.
+2. En frontend, AuthService usa environment.apiUrl, pero otros servicios usan URLs hardcodeadas a http://localhost:3000.
+3. El módulo reminders existe a nivel de estructura/entidades, pero su servicio y controlador están en estado base.
+4. Existe configuración para despliegue del frontend en Vercel (ver FocusHub-app/vercel.json).
 

@@ -1,6 +1,6 @@
 <app-nav></app-nav>
 <div class="header">
-    <div class="logo">🏠</div>
+    <div class="logo"><i class="fa-solid fa-house" aria-hidden="true"></i></div>
     <h1>Mis tareas</h1>
 </div>
 
@@ -18,7 +18,7 @@
                     <input type="checkbox" [checked]="task.status === 'completed'" (change)="toggleComplete(task.id)">
                     <span (click)="openTaskDetails(task)">{{ task.title }}</span>
                     <span class="task-date" *ngIf="task.dueDate">
-                        📅 {{ task.dueDate | date:'shortDate' }}
+                        <i class="fa-solid fa-calendar-days" aria-hidden="true"></i> {{ task.dueDate | date:'shortDate' }}
                     </span>
                 </div>
             </li>
@@ -26,7 +26,8 @@
 
         <div class="expandable-section">
             <button class="expand-btn" (click)="showCompleted = !showCompleted">
-                {{ showCompleted ? '▼' : '▶' }} Tareas completadas ({{ completedTasks.length }})
+                <i class="fa-solid" [class.fa-chevron-down]="showCompleted" [class.fa-chevron-right]="!showCompleted" aria-hidden="true"></i>
+                Tareas completadas ({{ completedTasks.length }})
             </button>
             <ul class="task-list" *ngIf="showCompleted">
                 <li *ngFor="let task of completedTasks" class="completed">
@@ -40,7 +41,8 @@
 
         <div class="expandable-section">
             <button class="expand-btn" (click)="showExpired = !showExpired">
-                {{ showExpired ? '▼' : '▶' }} Tareas vencidas ({{ expiredTasks.length }})
+                <i class="fa-solid" [class.fa-chevron-down]="showExpired" [class.fa-chevron-right]="!showExpired" aria-hidden="true"></i>
+                Tareas vencidas ({{ expiredTasks.length }})
             </button>
             <ul class="task-list" *ngIf="showExpired">
                 <li *ngFor="let task of expiredTasks" class="expired">
@@ -48,7 +50,7 @@
                         <input type="checkbox" [checked]="task.status === 'completed'" (change)="toggleComplete(task.id)">
                         <span (click)="openTaskDetails(task)">{{ task.title }}</span>
                         <span class="task-date">
-                            ⚠️ {{ task.dueDate | date:'shortDate' }}
+                            {{ task.dueDate | date:'shortDate' }}
                         </span>
                     </div>
                 </li>
