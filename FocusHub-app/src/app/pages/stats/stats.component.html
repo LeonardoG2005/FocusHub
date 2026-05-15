@@ -100,7 +100,17 @@
 </div>
 
 <div class="card trend-section analysis-section">
-  <h2 class="card-title">Análisis de Tendencias</h2>
+  <div class="analysis-header">
+    <h2 class="card-title">Análisis de Tendencias</h2>
+    <div class="year-selector" *ngIf="availableYears.length > 1">
+      <label for="yearSelect">Año</label>
+      <select id="yearSelect" [value]="selectedYear" (change)="setSelectedYear(($any($event.target)).value)">
+        @for (y of availableYears; track y) {
+          <option [value]="y">{{ y }}</option>
+        }
+      </select>
+    </div>
+  </div>
   <div class="trend-grid">
     <div class="trend-column">
       <h3 class="trend-title">Cumplimiento de tareas</h3>

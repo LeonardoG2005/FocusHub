@@ -49,8 +49,14 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
     if (!ids.length) return [];
 
     const tasks = this.taskService.tasks();
+    if (!tasks.length) return [];
+
+    const now = new Date();
     const byId = new Map<number, Task>(tasks.map((t) => [t.id, t]));
-    return ids.map((id) => byId.get(id)).filter((t): t is Task => !!t);
+    return ids
+      .map((id) => byId.get(id))
+      .filter((t): t is Task => !!t)
+      .filter((t) => !this.isTaskExpired(t, now));
   });
   focusSessionStatus: 'in_progress' | 'paused' | 'completed' | null = null;
   private restoredFromActiveSession = false;
@@ -85,6 +91,51 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
 
   constructor(private renderer: Renderer2) {
     this.taskService.loadTasks();
+
+    // Keep sessionTaskIds clean across route changes:
+    // - remove missing tasks
+    // - remove expired tasks (dueDate already passed and not completed)
+    effect(
+      () => {
+        const tasks = this.taskService.tasks();
+        const ids = this.getSessionTaskIds();
+        if (!ids.length) return;
+        if (!tasks.length) return;
+
+        const now = new Date();
+        const byId = new Map<number, Task>(tasks.map((t) => [t.id, t]));
+        const nextIds = ids.filter((id) => {
+          const task = byId.get(id);
+          if (!task) return false;
+          return !this.isTaskExpired(task, now);
+        });
+
+        if (nextIds.length !== ids.length) {
+          this.setSessionTaskIds(nextIds);
+
+          // If there is an active backend focus session, also clean up the relations.
+          const sessionId = this.techniqueService.currentFocusSessionId();
+          if (sessionId) {
+            const removed = ids.filter((id) => !nextIds.includes(id));
+            removed.forEach((taskId) => {
+              this.techniqueService.removeTaskFromFocusSession(sessionId, taskId).subscribe({
+                error: () => undefined,
+              });
+            });
+          }
+        }
+      },
+      { allowSignalWrites: true }
+    );
+  }
+
+  private isTaskExpired(task: Task, now: Date = new Date()): boolean {
+    if (!task?.dueDate) return false;
+    const due = new Date(task.dueDate);
+    if (!Number.isFinite(due.getTime())) return false;
+
+    const isExpirableStatus = task.status === 'pending' || task.status === 'in_progress' || task.status === 'overdue';
+    return isExpirableStatus && due.getTime() < now.getTime();
   }
 
   ngOnInit(): void {
@@ -209,9 +260,12 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
     this.changeTechniqueByName(name);
   }
 
-  isDeleteTechniqueDisabled(_name: string): boolean {
-    const hasActiveFocusSession = this.techniqueService.currentFocusSessionId() !== null;
-    return this.isRunning || hasActiveFocusSession || this.restoredFromActiveSession;
+  isDeleteTechniqueDisabled(name: string): boolean {
+    const isCurrentTechnique = name === this.currentTechnique?.name;
+    if (!isCurrentTechnique) return false;
+
+    const hasActiveFocusSession = this.techniqueService.currentFocusSessionId() !== null || this.restoredFromActiveSession;
+    return this.isRunning || hasActiveFocusSession;
   }
 
   confirmDeleteTechnique(technique: Technique, event: MouseEvent): void {
@@ -223,7 +277,7 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
         position: 'top-end',
         icon: 'info',
         title: 'No disponible',
-        text: 'No puedes eliminar técnicas mientras hay una sesión activa.',
+        text: 'No puedes eliminar la técnica actual mientras hay una sesión activa.',
         showConfirmButton: false,
         timer: 2600,
         timerProgressBar: true,

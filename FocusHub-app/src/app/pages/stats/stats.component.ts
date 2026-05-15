@@ -24,6 +24,9 @@ export class StatsComponent implements OnInit, OnDestroy {
   statsService = inject(StatsService);
   sessions: any[] = [];
 
+  availableYears: number[] = [];
+  selectedYear: number = new Date().getFullYear();
+
   completedToday = 0;
   pendingToday = 0;
   progressPercent = 0;
@@ -69,6 +72,18 @@ export class StatsComponent implements OnInit, OnDestroy {
         expanded: false
       }));
 
+      this.availableYears = Array.from(
+        new Set(
+          this.sessions
+            .map((s) => (s?.createdAt ? new Date(s.createdAt).getFullYear() : null))
+            .filter((y): y is number => typeof y === 'number' && Number.isFinite(y))
+        )
+      ).sort((a, b) => b - a);
+
+      if (this.availableYears.length > 0 && !this.availableYears.includes(this.selectedYear)) {
+        this.selectedYear = this.availableYears[0];
+      }
+
       this.processStats();
       console.log(this.sessions)
       this.createCharts();
@@ -90,6 +105,37 @@ export class StatsComponent implements OnInit, OnDestroy {
   this.themeObserver.observe(document.documentElement, {
     attributes: true
   });
+  }
+
+  setSelectedYear(year: string | number): void {
+    const next = typeof year === 'string' ? Number(year) : year;
+    if (!Number.isFinite(next)) return;
+    if (next === this.selectedYear) return;
+
+    this.selectedYear = next;
+    this.createLineChart();
+    this.createTrendChart();
+  }
+
+  private getBaseDateForSelectedYear(): Date {
+    const today = new Date();
+    const originalMonth = today.getMonth();
+
+    const base = new Date(today);
+    base.setFullYear(this.selectedYear);
+
+    // Handle Feb 29 -> Feb 28 when selected year is not leap.
+    if (base.getMonth() !== originalMonth) {
+      base.setDate(0);
+    }
+
+    return base;
+  }
+
+  private formatMonthDay(dateKey: string): string {
+    // dateKey is YYYY-MM-DD
+    if (typeof dateKey !== 'string' || dateKey.length < 10) return dateKey;
+    return dateKey.slice(5);
   }
 
   ngOnDestroy(): void {
@@ -216,12 +262,12 @@ export class StatsComponent implements OnInit, OnDestroy {
     if (!ctx) return;
 
     // Tareas completadas por día (últimos 7 días)
-    const today = new Date();
+    const baseDate = this.getBaseDateForSelectedYear();
     const tasksPerDay: Record<string, number> = {};
 
     for (let i = 6; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
+      const d = new Date(baseDate);
+      d.setDate(baseDate.getDate() - i);
       const key = this.toLocalDateKey(d);
       tasksPerDay[key] = 0;
     }
@@ -239,10 +285,13 @@ export class StatsComponent implements OnInit, OnDestroy {
       this.lineChart.destroy();
     }
 
+    const dateKeys = Object.keys(tasksPerDay);
+    const labels = dateKeys.map((k) => this.formatMonthDay(k));
+
     this.lineChart = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: Object.keys(tasksPerDay),
+        labels,
         datasets: [{
           label: 'Tareas completadas',
           data: Object.values(tasksPerDay),
@@ -262,12 +311,12 @@ export class StatsComponent implements OnInit, OnDestroy {
     if (!ctx) return;
 
     // Horas de concentración por día (últimos 7 días)
-    const today = new Date();
+    const baseDate = this.getBaseDateForSelectedYear();
     const focusPerDay: Record<string, number> = {};
 
     for (let i = 6; i >= 0; i--) {
-      const d = new Date(today);
-      d.setDate(today.getDate() - i);
+      const d = new Date(baseDate);
+      d.setDate(baseDate.getDate() - i);
       const key = this.toLocalDateKey(d);
       focusPerDay[key] = 0;
     }
@@ -286,10 +335,13 @@ export class StatsComponent implements OnInit, OnDestroy {
       this.trendChart.destroy();
     }
 
+    const dateKeys = Object.keys(focusPerDay);
+    const labels = dateKeys.map((k) => this.formatMonthDay(k));
+
     this.trendChart = new Chart(ctx, {
       type: 'line',
       data: {
-        labels: Object.keys(focusPerDay),
+        labels,
         datasets: [{
           label: 'Horas de concentración',
           data: Object.values(focusPerDay).map((v) => +v.toFixed(2)),

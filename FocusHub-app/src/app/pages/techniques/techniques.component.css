@@ -41,11 +41,13 @@ h1 i {
     justify-content: center;
     gap: 1rem;
     margin-bottom: 1rem;
+    flex-wrap: wrap;
 }
 
 .technique-dropdown {
     position: relative;
-    min-width: 200px;
+    min-width: 260px;
+    max-width: 100%;
 }
 
 .technique-dropdown-trigger {
@@ -63,6 +65,8 @@ h1 i {
 }
 
 .technique-dropdown-label {
+    flex: 1 1 auto;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -106,6 +110,8 @@ h1 i {
 }
 
 .technique-dropdown-item-label {
+    flex: 1 1 auto;
+    min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
@@ -300,6 +306,8 @@ select {
   border-radius: 8px;
   cursor: pointer;
   transition: all 0.15s ease;
+    position: relative;
+    flex: 0 0 auto;
 }
 
 .task-item input[type="checkbox"]:hover {
@@ -321,6 +329,7 @@ select {
   display: flex;
   align-items: center;
   justify-content: center;
+    pointer-events: none;
 }
 
 .btn-add-to-session {

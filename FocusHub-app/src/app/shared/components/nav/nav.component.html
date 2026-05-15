@@ -12,7 +12,7 @@
     <a [routerLink]="['/techniques']" routerLinkActive="active"> Tecnicas</a>
     <a [routerLink]="['/stats']" routerLinkActive="active">Historial y Estadísticas</a>
     <button (click)="modetoggle()" class="theme-toggle-button">
-        <i class="fa-solid fa-moon"></i>
+        <i class="fa-solid" [class.fa-sun]="darkmode" [class.fa-moon]="!darkmode" aria-hidden="true"></i>
     </button>
     <a (click)="logout()" id="logoutBtn" routerLinkActive="active"> Salir</a>
 </div>

@@ -5,14 +5,14 @@
             <h1><i class="fa-solid fa-clock" aria-hidden="true"></i> Técnicas de Concentración</h1>
             <div class="technique-selector">
                 <div class="technique-dropdown" #techniqueDropdown>
-                    <button type="button" class="technique-dropdown-trigger" (click)="toggleTechniqueDropdown()">
+                    <button type="button" class="technique-dropdown-trigger" (click)="toggleTechniqueDropdown()" [attr.title]="selectedTechniqueName || null">
                         <span class="technique-dropdown-label">{{ selectedTechniqueName || 'Selecciona una técnica' }}</span>
                         <i class="fa-solid fa-chevron-down" [class.open]="isTechniqueDropdownOpen" aria-hidden="true"></i>
                     </button>
 
                     <div class="technique-dropdown-menu" *ngIf="isTechniqueDropdownOpen">
                         <div class="technique-dropdown-item" *ngFor="let t of techniques" (click)="selectTechniqueFromDropdown(t.name)">
-                            <span class="technique-dropdown-item-label">{{ t.name }}</span>
+                            <span class="technique-dropdown-item-label" [attr.title]="t.name">{{ t.name }}</span>
                             <button
                                 type="button"
                                 class="technique-dropdown-item-delete"
