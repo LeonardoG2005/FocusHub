@@ -93,6 +93,21 @@ export class ProductivityService {
 
   async removeTechniqueByName(name: string, userId: number): Promise<void> {
     const technique = await this.findOneTechniqueByName(name, userId);
+
+    const sessionsUsingTechnique = await this.focusSessionRepository.count({
+      where: {
+        user: { id: userId },
+        technique: { id: technique.id },
+      },
+    });
+
+    if (sessionsUsingTechnique > 0) {
+      throw new BadRequestException(
+        'No puedes eliminar una técnica que ya tiene sesiones registradas. '
+        + 'Esto protege tu historial y estadísticas.'
+      );
+    }
+
     await this.techniqueRepository.remove(technique);
   }
 
