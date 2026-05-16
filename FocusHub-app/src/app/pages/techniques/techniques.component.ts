@@ -331,12 +331,23 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
           console.error('Error deleting technique:', err);
 
           const status = (err as any)?.status;
+          const backendMessage = (err as any)?.error?.message;
+          const backendText = Array.isArray(backendMessage)
+            ? backendMessage.filter(Boolean).join('\n')
+            : typeof backendMessage === 'string'
+              ? backendMessage
+              : null;
+
           const friendly =
-            status === 403
-              ? 'No tienes permisos para eliminar esta técnica.'
-              : status === 404
-                ? 'La técnica ya no existe o fue eliminada.'
-                : 'Ocurrió un error al eliminar la técnica. Intenta nuevamente.';
+            status === 0
+              ? 'No se pudo conectar con el servidor. Verifica que el backend esté encendido y que tu conexión esté bien.'
+              : status === 400
+                ? (backendText || 'No se puede eliminar esta técnica.')
+                : status === 403
+                  ? 'No tienes permisos para eliminar esta técnica.'
+                  : status === 404
+                    ? 'La técnica ya no existe o fue eliminada.'
+                    : 'Ocurrió un error al eliminar la técnica. Intenta nuevamente.';
 
           Swal.fire({
             title: 'No se pudo eliminar',
