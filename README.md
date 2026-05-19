@@ -1,4 +1,5 @@
 # FocusHub
+# FocusHub
 
 FocusHub es una aplicación compuesta por un frontend en Angular y un backend en NestJS. Este repositorio está preparado para ejecutarse fácilmente usando Docker y Docker Compose.
 
@@ -17,33 +18,111 @@ Asegurarse de tener instalado Docker Desktop y luego abrirlo.
 
 Antes de comenzar, asegúrese de tener instalado lo siguiente:
 
-- Node.js y npm (recomendado: Node 20.17.0)
-- Angular CLI
+- POST /productivity/focus-session-tasks
+- GET /productivity/focus-session-tasks
+- GET /productivity/focus-session-tasks/:id
+- PATCH /productivity/focus-session-tasks/:id
+- DELETE /productivity/focus-session-tasks/:id
+- DELETE /productivity/focus-sessions/:sessionId/tasks/:taskId
 
-Puedes instalar Angular CLI con el siguiente comando:
+Estadísticas:
 
-```bash
-npm install -g @angular/cli@19.2.6
+- GET /productivity/stats
+
+### Sonidos ambientales
+
+- GET /ambient-sounds
+- GET /ambient-sounds/:id
+- POST /ambient-sounds
+- PUT /ambient-sounds/:id
+- DELETE /ambient-sounds/:id
+
+## Requisitos
+
+- Node.js 20+
+- npm 10+
+- Docker Desktop (opcional, solo para flujo con contenedores)
+
+## Configuración de entorno
+
+En focus-hub-backend, crear un archivo .env para desarrollo local:
+
+```env
+JWT_SECRET=replace_with_secure_secret
+PORT=3000
+NODE_ENV=development
+LOGSTASH_HOST=localhost
+LOGSTASH_PORT=5000
 ```
----
 
-### Pasos para clonar y levantar la app
+Nota:
 
-1. **Clona el repositorio:**
+- JWT_SECRET es obligatorio para que la estrategia JWT arranque correctamente.
+- Actualmente main.ts escucha en el puerto 3000 de forma fija.
 
-```bash
-git clone https://github.com/PholCast/FocusHub.git
-cd FocusHub
-```
+## Ejecución local (sin Docker)
 
-2. **Instalar las dependencias del backend (NestJS)**
+### 1) Backend
+
 ```bash
 cd focus-hub-backend
 npm install
-cd ..
+npm run start:dev
 ```
 
-3. **Levantar la aplicación con Docker Compose**
+Backend disponible en:
+
+- http://localhost:3000
+- Swagger: http://localhost:3000/api
+
+### 2) Frontend
+
+```bash
+cd FocusHub-app
+npm install
+npm start
+```
+
+Frontend disponible en:
+
+### Pasos para clonar y levantar la app
+
+## Ejecución con Docker Compose
+
+```bash
+docker compose up
+```
+
+Servicios definidos en docker-compose.yml:
+
+- frontend: 4200
+- backend: 3000
+- mysql_db: 3307 (host) -> 3306 (container)
+- elasticsearch: 9200
+- logstash: 5000
+- kibana: 5601
+
+Nota:
+
+- El compose de la raíz usa imágenes publicadas en Docker Hub por defecto.
+- Las secciones build están comentadas en docker-compose.yml.
+
+## Scripts útiles
+
+### Backend
+
+```bash
+cd focus-hub-backend
+npm run build
+npm run start:dev
+npm run start:prod
+npm run lint
+npm run test
+npm run test:e2e
+```
+
+### Frontend
+
 ```bash
 docker-compose up
 ```

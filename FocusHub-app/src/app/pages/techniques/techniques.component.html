@@ -2,11 +2,28 @@
 <main>
     <div class="container">
         <header>
-            <h1>⏰ Técnicas de Concentración</h1>
+            <h1><i class="fa-solid fa-clock" aria-hidden="true"></i> Técnicas de Concentración</h1>
             <div class="technique-selector">
-                <select #techniqueSelect [value]="currentTechnique.name" (change)="changeTechnique($event)">
-                    <option *ngFor="let t of techniques" [value]="t.name">{{ t.name }}</option>
-                </select>
+                <div class="technique-dropdown" #techniqueDropdown>
+                    <button type="button" class="technique-dropdown-trigger" (click)="toggleTechniqueDropdown()" [attr.title]="selectedTechniqueName || null">
+                        <span class="technique-dropdown-label">{{ selectedTechniqueName || 'Selecciona una técnica' }}</span>
+                        <i class="fa-solid fa-chevron-down" [class.open]="isTechniqueDropdownOpen" aria-hidden="true"></i>
+                    </button>
+
+                    <div class="technique-dropdown-menu" *ngIf="isTechniqueDropdownOpen">
+                        <div class="technique-dropdown-item" *ngFor="let t of techniques" (click)="selectTechniqueFromDropdown(t.name)">
+                            <span class="technique-dropdown-item-label" [attr.title]="t.name">{{ t.name }}</span>
+                            <button
+                                type="button"
+                                class="technique-dropdown-item-delete"
+                                (click)="confirmDeleteTechnique(t, $event)"
+                                [disabled]="isDeleteTechniqueDisabled(t.name)"
+                                title="Eliminar técnica">
+                                <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                            </button>
+                        </div>
+                    </div>
+                </div>
                 <button (click)="showNewTechniqueModal()" class="btn-add">+ Nueva Técnica</button>
             </div>
         </header>
@@ -64,7 +81,7 @@
                 <div class="session-tasks" style="flex: 1; gap: 20px;">
                     <h3>Tareas de Sesión</h3>
                     <div class="tasks-list">
-                        <div class="task-item" *ngFor="let task of sessionTasks()">
+                        <div class="task-item" *ngFor="let task of sessionTasks()" [class.completed]="task.status === 'completed'">
                             <input type="checkbox"
                                    [id]="'session-task-' + task.id"
                                    [checked]="task.status === 'completed'"
@@ -163,9 +180,15 @@
             </div>
             <div #floatingTimerDisplay class="floating-timer-display">{{ timeLeft() }}</div>
             <div class="floating-timer-controls">
-                <button (click)="startFloatingTimer()" [disabled]="isRunning" class="floating-btn start">▶</button>
-                <button (click)="stopFloatingTimer()" [disabled]="!isRunning" class="floating-btn pause">⏸</button>
-                <button (click)="resetFloatingTimer()" class="floating-btn reset">⟳</button>
+                <button (click)="startFloatingTimer()" [disabled]="isRunning" class="floating-btn start" title="Iniciar">
+                    <i class="fa-solid fa-play" aria-hidden="true"></i>
+                </button>
+                <button (click)="stopFloatingTimer()" [disabled]="!isRunning" class="floating-btn pause" title="Pausar">
+                    <i class="fa-solid fa-pause" aria-hidden="true"></i>
+                </button>
+                <button (click)="resetFloatingTimer()" class="floating-btn reset" title="Reiniciar">
+                    <i class="fa-solid fa-rotate-left" aria-hidden="true"></i>
+                </button>
             </div>
         </div>
     </div>

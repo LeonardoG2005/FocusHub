@@ -13,6 +13,7 @@ export interface TechniquesUiState {
   timeLeft: number;
   isRunning: boolean;
   pomodoroCount: number;
+  sessionTaskIds: number[];
   lastUpdatedAt: number;
 }
 
@@ -31,6 +32,7 @@ export class TechniqueService {
     timeLeft: 0,
     isRunning: false,
     pomodoroCount: 0,
+    sessionTaskIds: [],
     lastUpdatedAt: Date.now(),
   });
 
@@ -43,6 +45,22 @@ export class TechniqueService {
 
   constructor() {
     this.hydrateTechniquesUiState();
+  }
+
+  resetTechniquesState(): void {
+    this.currentFocusSessionId.set(null);
+    this.techniques.set([]);
+    this.techniquesMap.set({});
+    this.techniquesUiState.set({
+      selectedTechniqueName: null,
+      currentMode: 'work',
+      timeLeft: 0,
+      isRunning: false,
+      pomodoroCount: 0,
+      sessionTaskIds: [],
+      lastUpdatedAt: Date.now(),
+    });
+    sessionStorage.removeItem(this.techniquesStateKey);
   }
 
   private getUserId(): number | null {
@@ -62,6 +80,9 @@ export class TechniqueService {
         timeLeft: typeof parsed.timeLeft === 'number' ? parsed.timeLeft : 0,
         isRunning: !!parsed.isRunning,
         pomodoroCount: typeof parsed.pomodoroCount === 'number' ? parsed.pomodoroCount : 0,
+        sessionTaskIds: Array.isArray((parsed as any).sessionTaskIds)
+          ? (parsed as any).sessionTaskIds.filter((id: unknown) => typeof id === 'number')
+          : [],
         lastUpdatedAt: typeof parsed.lastUpdatedAt === 'number' ? parsed.lastUpdatedAt : Date.now(),
       });
     } catch (error) {
@@ -89,7 +110,7 @@ export class TechniqueService {
 
 fetchTechniques(): Observable<Technique[]> {
   const userId = this.getUserId();
-  console.log(`🔄 Fetching techniques (global + user${userId ? ` ${userId}` : ''})`);
+  console.log(`Fetching techniques (global + user${userId ? ` ${userId}` : ''})`);
 
   const global$ = this.http
     .get<Technique[]>(`${this.baseUrl}/global`, this.getHeaders())
@@ -104,7 +125,7 @@ fetchTechniques(): Observable<Technique[]> {
   return forkJoin([global$, user$]).pipe(
     map(([global, user]) => [...global, ...user]),
     tap((fetched) => {
-      console.log('📦 Techniques fetched from server (merged):', fetched);
+      console.log('Techniques fetched from server (merged):', fetched);
 
       // 1️⃣ Actualizamos el array
       this.techniques.set(fetched);
@@ -160,7 +181,8 @@ fetchTechniques(): Observable<Technique[]> {
       return new Observable<Technique>();
     }
 
-    return this.http.patch<Technique>(`${this.baseUrl}/${name}?userId=${userId}`, updated, this.getHeaders()).pipe(
+    const encodedName = encodeURIComponent(name);
+    return this.http.patch<Technique>(`${this.baseUrl}/${encodedName}?userId=${userId}`, updated, this.getHeaders()).pipe(
       tap((updatedTechnique) => {
         const updatedList = this.techniques().map(t =>
           t.name === name ? updatedTechnique : t
@@ -183,7 +205,8 @@ fetchTechniques(): Observable<Technique[]> {
       return new Observable<void>();
     }
 
-    return this.http.delete<void>(`${this.baseUrl}/${name}?userId=${userId}`, this.getHeaders()).pipe(
+    const encodedName = encodeURIComponent(name);
+    return this.http.delete<void>(`${this.baseUrl}/${encodedName}?userId=${userId}`, this.getHeaders()).pipe(
       tap(() => {
         const updatedList = this.techniques().filter(t => t.name !== name);
         this.techniques.set(updatedList);
@@ -238,6 +261,9 @@ fetchTechniques(): Observable<Technique[]> {
       }),
       catchError((error) => {
         console.warn('No active focus session found:', error);
+        if (error?.status === 404 && this.techniquesUiState().isRunning) {
+          this.currentFocusSessionId.set(null);
+        }
         return of(null);
       })
     );
