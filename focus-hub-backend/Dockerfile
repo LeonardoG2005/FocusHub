@@ -1,15 +1,13 @@
-FROM node:23.11.1-alpine AS builder 
+FROM node:22-alpine AS builder 
 
 WORKDIR /usr/src/app
 
 
+RUN apk add --no-cache python3 make g++
+
 COPY package*.json ./
 COPY package*-lock.json ./
-RUN npm install 
-RUN npm install class-validator
-RUN npm install class-transformer
-RUN npm install winston
-RUN npm install winston-transport
+RUN npm ci
 
 
 COPY tsconfig.json ./
@@ -17,7 +15,7 @@ COPY . ./
 
 RUN npm run build
 
-FROM node:23.11.1-alpine AS runner 
+FROM node:22-alpine AS runner 
 
 WORKDIR /usr/src/app
 
