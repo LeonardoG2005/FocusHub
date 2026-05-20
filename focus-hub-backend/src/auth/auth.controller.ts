@@ -21,7 +21,11 @@ export class AuthController {
   @Post('register')
   async register(@Body() signUpDto:SignUpDto) {
     try {
-      return await this.authService.register(signUpDto);
+      const created = await this.authService.register(signUpDto);
+      // Never return password hashes to the client.
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { password, ...safeUser } = created as any;
+      return safeUser;
     } catch (error) {
       if (error.message === 'Email already registered') {
         throw new ConflictException('Este correo electrónico ya está registrado');

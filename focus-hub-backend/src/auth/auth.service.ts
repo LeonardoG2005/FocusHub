@@ -52,7 +52,16 @@ export class AuthService {
 
 
   async login(email: string, password: string): Promise<any> {
-    const user = await this.usersRepository.findOne({ where: { email } });
+    const user = await this.usersRepository.findOne({
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        password: true,
+        name: true,
+        lastname: true,
+      },
+    });
 
     if (!user) {
       throw new Error('User not found');
