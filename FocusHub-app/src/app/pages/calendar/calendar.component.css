@@ -2,84 +2,107 @@
     font-family: 'Segoe UI', sans-serif;
     max-width: 1200px;
     margin: 20px auto;
-    padding: 20px;
-    background-color: var(--container);
-    border-radius: 8px;
-    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+    padding: 30px;
+    background: var(--container);
+    border-radius: 16px;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.8);
+    animation: slideInUp 0.5s ease-out;
 }
 
 .calendar-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 20px;
+    margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 2px solid rgba(33, 150, 243, 0.1);
 }
 
 .calendar-header>div {
     display: flex;
     align-items: center;
-    gap: 15px;
+    gap: 20px;
 }
 
 .calendar-header h2 {
     margin: 0;
-    font-size: 1.5rem;
-    color: var(--text-title);
+    font-size: 28px;
+    font-weight: 700;
+    background: linear-gradient(135deg, var(--accent-color) 0%, #1976D2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.5px;
 }
 
 .calendar-header button {
-    background: none;
-    border: none;
-    font-size: 1.5rem;
+    background: linear-gradient(135deg, rgba(33, 150, 243, 0.1) 0%, rgba(33, 150, 243, 0.05) 100%);
+    border: 2px solid rgba(33, 150, 243, 0.2);
+    font-size: 1.3rem;
     cursor: pointer;
-    padding: 0 10px;
-    color: #555;
-    transition: color 0.2s;
+    padding: 12px 14px;
+    color: var(--accent-color);
+    transition: var(--transition-bounce);
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .calendar-header button:hover {
-    color: #1976d2;
+    background: linear-gradient(135deg, rgba(33, 150, 243, 0.2) 0%, rgba(33, 150, 243, 0.1) 100%);
+    border-color: var(--accent-color);
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(33, 150, 243, 0.2);
 }
 
 .view-toggle {
-    background-color: #f5f5f5;
-    border: 1px solid #ddd;
-    border-radius: 4px;
-    padding: 8px 16px;
+    background: linear-gradient(135deg, var(--accent-color) 0%, #1976D2 100%);
+    border: none;
+    border-radius: 10px;
+    padding: 10px 20px;
     cursor: pointer;
-    font-size: 0.9rem;
-    transition: all 0.2s;
-    color: var(--text-title);
+    font-size: 0.95rem;
+    transition: var(--transition-bounce);
+    color: white;
+    font-weight: 600;
+    letter-spacing: 0.3px;
 }
 
 .view-toggle:hover {
-    background-color: #e0e0e0;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(33, 150, 243, 0.3);
 }
 
 .calendar-month-view .calendar-grid {
     display: grid;
     grid-template-columns: repeat(7, 1fr);
-    gap: 8px;
+    gap: 12px;
+    animation: fadeIn 0.5s ease-out;
 }
 
 .calendar-weekday {
     text-align: center;
-    font-weight: bold;
-    padding: 10px;
-    background-color: var(--background-color-week);
-    border-radius: 4px;
-    color: var(--text-title);
+    font-weight: 700;
+    padding: 14px;
+    background: linear-gradient(135deg, rgba(33, 150, 243, 0.1) 0%, rgba(33, 150, 243, 0.05) 100%);
+    border-radius: 10px;
+    color: var(--accent-color);
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    font-size: 0.9rem;
 }
 
 .calendar-day {
-    min-height: 100px;
-    border: 1px solid var(--border-week);
-    border-radius: 4px;
-    padding: 5px;
+    min-height: 110px;
+    border: 2px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 8px;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: var(--transition-smooth);
     background-color: var(--background-color-week);
-    opacity: 0.7;
+    opacity: 0.6;
 }
 
 .calendar-day.current-month {
@@ -87,18 +110,24 @@
 }
 
 .calendar-day:hover {
-    background-color: var(--background-color-hover);
+    background: linear-gradient(135deg, rgba(33, 150, 243, 0.1) 0%, rgba(33, 150, 243, 0.05) 100%);
+    border-color: var(--accent-color);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 20px rgba(33, 150, 243, 0.15);
 }
 
 .calendar-day.selected {
-    background-color: #e3f2fd;
-    border-color: #bbdefb;
+    background: linear-gradient(135deg, rgba(33, 150, 243, 0.2) 0%, rgba(33, 150, 243, 0.1) 100%);
+    border-color: var(--accent-color);
+    box-shadow: 0 8px 20px rgba(33, 150, 243, 0.2);
 }
 
 .day-number {
-    font-weight: bold;
-    margin-bottom: 5px;
+    font-weight: 700;
+    margin-bottom: 8px;
     text-align: right;
+    font-size: 14px;
+    color: var(--text-color);
 }
 
 .day-events {
@@ -108,15 +137,16 @@
 }
 
 .day-events .event-item {
-    font-size: 0.8rem;
+    font-size: 0.75rem;
     padding: 4px 6px;
     margin-bottom: 3px;
-    border-radius: 3px;
+    border-radius: 6px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: var(--transition-smooth);
+    font-weight: 500;
 }
 
 .day-events .event-item:hover {
@@ -124,30 +154,31 @@
 }
 
 .day-events .event-item.event {
-    background-color: #e3f2fd;
-    color: #1976d2;
-    border-left: 3px solid #1976d2;
+    background: linear-gradient(135deg, rgba(33, 150, 243, 0.2) 0%, rgba(25, 118, 210, 0.1) 100%);
+    color: var(--accent-color);
+    border-left: 3px solid var(--accent-color);
 }
 
 .day-events .event-item.task {
-    background-color: #e8f5e9;
-    color: #388e3c;
-    border-left: 3pt solid #388e3c;
+    background: linear-gradient(135deg, rgba(76, 175, 80, 0.2) 0%, rgba(56, 142, 60, 0.1) 100%);
+    color: #4CAF50;
+    border-left: 3px solid #4CAF50;
 }
 
 .calendar-week-view {
     display: grid;
     grid-template-rows: auto 1fr;
-    gap: 10px;
+    gap: 15px;
     margin-top: 20px;
 }
 
 .week-tasks-container {
     display: grid;
     grid-template-columns: 50px repeat(7, 1fr);
-    padding: 10px 5px 0;
-    background-color: var(--background-color-day);
-    border-bottom: 1px solid var(--border-week);
+    padding: 15px 5px;
+    background: linear-gradient(135deg, rgba(33, 150, 243, 0.05) 0%, transparent 100%);
+    border-bottom: 2px solid rgba(33, 150, 243, 0.1);
+    border-radius: 10px 10px 0 0;
 }
 
 .week-tasks-container .day-tasks {

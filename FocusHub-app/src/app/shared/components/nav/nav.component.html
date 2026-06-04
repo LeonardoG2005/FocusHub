@@ -7,12 +7,22 @@
         </div>
     </div>
 
-    <a [routerLink]="['/tasks']" routerLinkActive="active"> Tareas</a>
-    <a [routerLink]="['/calendar']" routerLinkActive="active"> Calendario</a>
-    <a [routerLink]="['/techniques']" routerLinkActive="active"> Tecnicas</a>
-    <a [routerLink]="['/stats']" routerLinkActive="active">Historial y Estadísticas</a>
+    <a [routerLink]="['/tasks']" routerLinkActive="active">
+        <i class="fa-solid fa-list-check" aria-hidden="true"></i> Tareas
+    </a>
+    <a [routerLink]="['/calendar']" routerLinkActive="active">
+        <i class="fa-solid fa-calendar-alt" aria-hidden="true"></i> Calendario
+    </a>
+    <a [routerLink]="['/techniques']" routerLinkActive="active">
+        <i class="fa-solid fa-brain" aria-hidden="true"></i> Técnicas
+    </a>
+    <a [routerLink]="['/stats']" routerLinkActive="active">
+        <i class="fa-solid fa-chart-line" aria-hidden="true"></i> Estadísticas
+    </a>
     <button (click)="modetoggle()" class="theme-toggle-button">
         <i class="fa-solid" [class.fa-sun]="darkmode" [class.fa-moon]="!darkmode" aria-hidden="true"></i>
     </button>
-    <a (click)="logout()" id="logoutBtn" routerLinkActive="active"> Salir</a>
+    <a (click)="logout()" id="logoutBtn" routerLinkActive="active">
+        <i class="fa-solid fa-sign-out-alt" aria-hidden="true"></i> Salir
+    </a>
 </div>

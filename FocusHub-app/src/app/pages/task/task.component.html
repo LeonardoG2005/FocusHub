@@ -1,13 +1,13 @@
 <app-nav></app-nav>
 <div class="header">
-    <div class="logo"><i class="fa-solid fa-house" aria-hidden="true"></i></div>
-    <h1>Mis tareas</h1>
+    <div class="logo"><i class="fa-solid fa-circle-check" aria-hidden="true"></i></div>
+    <h1>Mi Centro de Tareas</h1>
 </div>
 
 <div class="task-container">
     <div class="task-list-container">
         <div class="add-task">
-            <input type="text" placeholder="Añadir una tarea" #newTaskTitle
+            <input type="text" placeholder="Crear una nueva tarea..." #newTaskTitle
                 (keyup.enter)="addTask(newTaskTitle.value); newTaskTitle.value = ''">
         </div>
 
@@ -60,7 +60,7 @@
 
     <aside class="task-details-panel" *ngIf="selectedTask">
         <div class="task-details-header">
-            <h3>Detalles de la tarea</h3>
+            <h3>Detalles de la Tarea</h3>
             <button class="close-btn" (click)="closeDetails()">×</button>
         </div>
 
@@ -78,7 +78,7 @@
             <div class="detail-item">
                 <label>Descripción</label>
                 <textarea [(ngModel)]="selectedTask.description" [disabled]="selectedTask.status === 'completed'"
-                    rows="4"></textarea>
+                    placeholder="Añade detalles de tu tarea..." rows="4"></textarea>
             </div>
 
             <div class="detail-item">
