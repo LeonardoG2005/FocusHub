@@ -1,5 +1,5 @@
 .calendar-container {
-    font-family: 'Segoe UI', sans-serif;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
     max-width: 1200px;
     margin: 20px auto;
     padding: 30px;
@@ -388,7 +388,7 @@
     padding: 2px 5px;
     border-radius: 3px;
     font-size: 0.8rem;
-    background-color: #e3f2fd; 
+    background-color: #e3f2fd;
     color: #1976d2;
     border-left: 3px solid #1976d2;
     pointer-events: auto;
@@ -624,7 +624,7 @@
     border: 1px solid var(--border-week);
     border-radius: 4px;
     box-sizing: border-box;
-    font-family: inherit;
+    font-family: 'Inter', inherit;
     font-size: 1rem;
     background-color: var(--background-color-day);
     color: var(--text-color);
@@ -738,11 +738,11 @@
 @media (max-width: 768px) {
     .calendar-container {
         padding: 10px;
-        
+
         margin-left: 0 !important;
-        
-        
-        
+
+
+
     }
 
     .calendar-header {
@@ -753,47 +753,47 @@
 
     .view-toggle {
         align-self: flex-end;
-        
+
     }
 
-    
+
     .calendar-month-view .calendar-grid {
         gap: 1px;
-        
+
     }
 
     .calendar-weekday {
         padding: 8px;
-        
+
         font-size: 0.6rem;
     }
 
     .calendar-day{
         max-width: 100%;
         min-height: 80px;
-        
+
         padding: 3px;
-        
+
         overflow-x: hidden;
-        min-width: 0; 
+        min-width: 0;
     }
 
     .day-number {
         font-size: 0.9em;
-        
+
         margin-bottom: 3px;
     }
 
     .day-events {
         max-height: 60px;
         max-width: 100%;
-        overflow-x: hidden; 
-        
+        overflow-x: hidden;
+
     }
 
     .day-events .event-item {
         font-size: 0.7rem;
-        
+
         padding: 3px 4px;
         margin-bottom: 2px;
     }
@@ -801,14 +801,14 @@
     .calendar-month-view .day-events {
         max-height: 60px;
         width: 100%;
-        
+
     }
 
     .calendar-month-view .event-item {
         font-size: 0.7rem !important;
         padding: 3px 4px !important;
         margin-bottom: 2px !important;
-        
+
         white-space: nowrap !important;
         max-width: 100%;
         overflow: hidden !important;
@@ -819,15 +819,15 @@
     }
 
 
-    
+
     .week-header,
     .week-tasks-container,
     .week-grid {
-        
+
         grid-template-columns: 20px repeat(7, 1fr);
         width: 100%;
         gap: 2px;
-        
+
     }
      .week-header{
         width: 100%;
@@ -835,57 +835,57 @@
     .hour-header-placeholder,
     .hour-column {
         width: 100%;
-        
+
     }
 
     .hour-label{
         text-align: left;
         width:100%;
-        
+
     }
 
     .week-day {
         padding: 3px;
         max-width: 30px;
-        
+
     }
 
     .day-name {
         font-size: 0.8em;
-        
+
         margin-bottom: 1px;
-        
+
     }
 
     .day-date {
         font-size: 0.9em;
-        
+
     }
 
     .week-tasks-container {
         padding: 8px 3px 0;
-        
+
     }
 
     .week-tasks-container .day-tasks {
         margin: 0.5px;
         max-width: 100%;
-        
+
         padding: 10px;
-        
+
         gap: 0.5px;
-        
+
     }
 
     .week-tasks-container .day-tasks .event-item.task {
         width: 90%;
         margin-left: -5px;
         font-size: 0.65rem;
-        
+
         padding: 5px 5px;
-        
+
         margin-bottom: 1px;
-        
+
     }
 
     .calendar-week-view .week-grid {
@@ -900,91 +900,91 @@
 
         margin-left: -5px;
         font-size: 0.7rem;
-        
+
         padding: 5px 5px;
-        
+
     }
 
 
     .week-grid {
         height: calc(24 * 40px);
-        
+
         gap: 2px;
-        
+
     }
 
     .hour-column {
         grid-template-rows: repeat(24, 40px);
-        
+
     }
 
     .hour-label {
         font-size: 0.65rem;
-        
+
         padding: 2px;
-        
+
     }
 
     .day-column {
         grid-template-rows: repeat(24, 40px);
-        
+
     }
 
     .hour-slot {
         height: 40px;
-        
+
     }
 
     .event-in-slot {
         font-size: 0.65rem;
-        
+
         padding: 1px 2px;
-        
+
         left: 1px;
-        
+
         right: 1px;
-        
+
         height: 90%;
     }
 
     .event-in-slot .event-title {
         line-height: 1.1;
-        
+
     }
 
 
-    
+
     .daily-view-container {
         flex-direction: column;
         height: auto;
-        
+
         min-height: auto;
-        
+
     }
 
     .hour-slots-container {
         flex: auto;
-        
-        
+
+
         border: none;
         border-radius: 0;
         overflow-y: visible;
-        
+
     }
 
     .tasks-container {
         flex: auto;
-        
+
         margin-left: 0;
         margin-top: 20px;
-        
+
         padding: 15px;
-        
+
         border: 1px solid #eee;
-        
+
         border-radius: 4px;
         overflow-y: visible;
-        
+
     }
 
     .tasks-container h4 {
@@ -1001,30 +1001,30 @@
 
     .daily-view-container .hour-slot {
         height: 50px;
-        
+
         padding-left: 40px;
-        
+
     }
 
     .daily-view-container .hour-slot .hour-label {
         left: 5px;
-        
+
         font-size: 0.7rem;
-        
+
     }
 
     .daily-view-container .event-in-slot {
         font-size: 0.7rem;
-        
+
         padding: 1px 3px;
     }
 
-    
+
     .event-form {
         padding: 20px;
-        
+
         max-width: 95%;
-        
+
     }
 
     .event-form h3 {
@@ -1045,14 +1045,14 @@
     .form-group textarea,
     .form-group select {
         padding: 8px;
-        
+
         font-size: 0.9rem;
     }
 
     .time-selection {
         flex-direction: column;
         gap: 10px;
-        
+
         margin-bottom: 15px;
     }
 
@@ -1062,17 +1062,17 @@
 
     .form-actions {
         flex-direction: column;
-        
+
         gap: 8px;
-        
+
     }
 
     .form-actions button {
         width: 100%;
-        
+
         text-align: center;
         padding: 10px;
-        
+
         font-size: 0.9rem;
     }
 }

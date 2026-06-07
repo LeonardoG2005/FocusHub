@@ -72,6 +72,11 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
     return this.taskService.pendingTasks();
   }
 
+  formatTechniqueName(name: string | null | undefined): string {
+    if (!name) return '';
+    return name.charAt(0).toUpperCase() + name.slice(1);
+  }
+
   newTechniqueForm: FormGroup = this.fb.group({
     name: ['', Validators.required],
     workDuration: [null, [Validators.required, Validators.min(1), Validators.max(120)]],
@@ -209,22 +214,22 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
             this.currentTechnique = technique;
             this.restoredFromActiveSession = true;
             this.selectedTechniqueName = this.currentTechnique.name;
-            
+
             // Calculate remaining time: workTime - elapsedSeconds
             const remainingSeconds = technique.workTime - session.elapsedSeconds;
             this.timeLeft.set(Math.max(0, remainingSeconds));
-            
+
             this.focusSessionStatus = 'in_progress';
             this.isRunning = true;
             this.currentMode = 'work';
             this.techniqueService.setSelectedTechnique(this.currentTechnique.name);
             this.persistUiState();
-            
+
             // Resume the timer immediately
             this.startTimerInterval();
             this.updateTimerDisplay();
             this.updateProgressCircle();
-            
+
             console.log(`Session restored. Elapsed: ${session.elapsedSeconds}s, Remaining: ${remainingSeconds}s`);
 
             // Restore session tasks (if backend includes them).

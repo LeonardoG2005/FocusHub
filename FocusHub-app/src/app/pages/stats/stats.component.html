@@ -52,7 +52,7 @@
     <div class="concentration-time">
       <div class="time-number">{{ focusTimeTodayLabel }}</div>
       <div class="time-label">Tiempo total hoy</div>
-    </div> 
+    </div>
   </div>
 </div>
 
@@ -61,7 +61,7 @@
     <div class="card">
       <h2 class="card-title">Técnica Más Usada</h2>
       <div class="technique-display">
-        <div class="technique-name">{{ mostUsedTechnique }}</div>
+        <div class="technique-name">{{ mostUsedTechnique | titlecase  }}</div>
       </div>
     </div>
 
@@ -136,7 +136,7 @@
     <div class="session-item">
       <div class="session-header" (click)="toggleSession(session)">
         <div>
-          <div class="session-technique">{{ session.technique.name }}</div>
+          <div class="session-technique">{{ session.technique.name  | titlecase  }}</div>
           <div class="session-info">{{ session.createdAt ? (session.createdAt | date: 'dd/MM/yyyy, HH:mm') : 'Sin fecha' }} | {{session.status === 'completed' ? 'Completada' : 'En progreso' }} | {{ getSessionDurationLabel(session) }} | {{ session.focusSessionTasks.length }} tareas</div>
         </div>
         <div class="session-arrow" [style.transform]="session.expanded ? 'rotate(90deg)' : 'rotate(0deg)'">
