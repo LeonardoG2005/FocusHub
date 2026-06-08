@@ -77,6 +77,12 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
     return name.charAt(0).toUpperCase() + name.slice(1);
   }
 
+  formatTime(seconds: number): string {
+    const minutes = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  }
+
   newTechniqueForm: FormGroup = this.fb.group({
     name: ['', Validators.required],
     workDuration: [null, [Validators.required, Validators.min(1), Validators.max(120)]],
@@ -147,30 +153,52 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
     // First restore local UI snapshot from singleton state.
     const persistedState = this.techniqueService.techniquesUiState();
     this.currentMode = persistedState.currentMode;
-    this.isRunning = persistedState.isRunning;
     this.pomodoroCount = persistedState.pomodoroCount;
 
+    // IMPORTANT: Only restore isRunning if there's an active session ID already set
+    // This prevents false positives when returning to the page
+    const hasActiveSession = this.techniqueService.currentFocusSessionId() !== null;
+    
+    // If we already have an active session, trust the persisted timeLeft
+    // Don't try to recalculate it
+    if (hasActiveSession) {
+      this.isRunning = persistedState.isRunning;
+      this.timeLeft.set(persistedState.timeLeft || 0);
+      
+      // Restore the technique from persisted state
+      this.techniqueService.fetchTechniques().subscribe(() => {
+        const list = this.techniqueService.techniques();
+        if (!list || list.length === 0) return;
+        
+        const persistedName = persistedState.selectedTechniqueName;
+        const persistedTechnique = persistedName
+          ? list.find((t) => t.name === persistedName)
+          : undefined;
+        
+        if (persistedTechnique) {
+          this.currentTechnique = persistedTechnique;
+          this.selectedTechniqueName = persistedTechnique.name;
+        }
+        
+        this.updateTimerDisplay();
+        this.updateProgressCircle();
+        
+        // Resume timer if was running
+        if (this.isRunning && !this.timerIntervalSubscription) {
+          console.log('Resuming active session timer');
+          this.startTimerInterval();
+        }
+      });
+      return; // Exit early, don't fetch again below
+    }
+
+    // Fetch techniques first - this is needed to populate the dropdown
     this.techniqueService.fetchTechniques().subscribe(() => {
       const list = this.techniqueService.techniques();
       if (!list || list.length === 0) return;
 
-      // If we already restored an active backend session, keep that technique/time
-      // and only sync the dropdown selection against the fetched list.
-      if (this.restoredFromActiveSession) {
-        const activeName = this.currentTechnique?.name;
-        const match = activeName ? list.find((t) => t.name === activeName) : undefined;
-        if (match) {
-          this.currentTechnique = match;
-        }
-        this.selectedTechniqueName = this.currentTechnique.name;
-        this.techniqueService.setSelectedTechnique(this.currentTechnique.name);
-        this.persistUiState();
-        this.updateTimerDisplay();
-        this.updateProgressCircle();
-        return;
-      }
-
-      const persistedName = this.techniqueService.techniquesUiState().selectedTechniqueName;
+      // Set current technique from persisted state or fallback
+      const persistedName = persistedState.selectedTechniqueName;
       const persistedTechnique = persistedName
         ? list.find((t) => t.name === persistedName)
         : undefined;
@@ -178,44 +206,48 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
 
       this.currentTechnique = persistedTechnique || pomodoro || list[0];
       this.selectedTechniqueName = this.currentTechnique.name;
+      this.techniqueService.setSelectedTechnique(this.currentTechnique.name);
 
-      if (!this.restoredFromActiveSession) {
+      // Set timeLeft from persisted state
+      // If was running, restore the saved timeLeft
+      // Otherwise, show full duration for current mode
+      if (persistedState.isRunning && persistedState.timeLeft > 0) {
+        this.timeLeft.set(persistedState.timeLeft);
+        this.isRunning = true;
+      } else {
         const totalForMode = this.getTotalSecondsForMode(this.currentMode);
-        // Only restore a leftover time when the timer is actually running.
-        // Otherwise, show the full duration for the selected technique/mode.
-        const shouldRestoreTime = !!persistedState.isRunning;
-        const restored = shouldRestoreTime && persistedState.timeLeft > 0 ? persistedState.timeLeft : totalForMode;
-        const initialTime = totalForMode > 0 ? Math.min(restored, totalForMode) : restored;
-        this.timeLeft.set(initialTime);
-
-        // Fallback: if backend has no active session (e.g. break mode), continue local timer.
-        if (persistedState.isRunning && !this.timerIntervalSubscription) {
-          this.startTimerInterval();
-        }
+        this.timeLeft.set(totalForMode);
+        this.isRunning = false;
       }
 
-      this.techniqueService.setSelectedTechnique(this.currentTechnique.name);
       this.persistUiState();
       this.updateTimerDisplay();
       this.updateProgressCircle();
+
+      // Resume timer if was running before
+      if (this.isRunning && !this.timerIntervalSubscription) {
+        console.log('Resuming timer from persisted state');
+        this.startTimerInterval();
+      }
     });
 
-    // Check if there's an active focus session and restore it
+    // Check if there's an active focus session ONLY if we don't have one already
     const tokenData = this.tokenService.decodeToken();
     const userId = tokenData?.sub;
 
-    if (userId) {
+    if (userId && !hasActiveSession) {
       this.techniqueService.getActiveFocusSession(userId).subscribe({
         next: (session) => {
-          if (session) {
-            console.log('Active session found:', session);
-            // Restore the timer with elapsed time
+          if (session && !this.restoredFromActiveSession) {
+            console.log('Active session found on first load:', session);
+            
             const technique = session.technique;
             this.currentTechnique = technique;
             this.restoredFromActiveSession = true;
             this.selectedTechniqueName = this.currentTechnique.name;
 
-            // Calculate remaining time: workTime - elapsedSeconds
+            // Calculate remaining time
+            // workTime is in SECONDS (backend converts minutes * 60)
             const remainingSeconds = technique.workTime - session.elapsedSeconds;
             this.timeLeft.set(Math.max(0, remainingSeconds));
 
@@ -223,16 +255,9 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
             this.isRunning = true;
             this.currentMode = 'work';
             this.techniqueService.setSelectedTechnique(this.currentTechnique.name);
-            this.persistUiState();
+            this.techniqueService.currentFocusSessionId.set(session.id);
 
-            // Resume the timer immediately
-            this.startTimerInterval();
-            this.updateTimerDisplay();
-            this.updateProgressCircle();
-
-            console.log(`Session restored. Elapsed: ${session.elapsedSeconds}s, Remaining: ${remainingSeconds}s`);
-
-            // Restore session tasks (if backend includes them).
+            // Restore session tasks
             const idsFromBackend = Array.isArray(session.focusSessionTasks)
               ? session.focusSessionTasks
                   .map((fst: any) => fst?.task?.id ?? fst?.taskId)
@@ -241,6 +266,13 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
             if (idsFromBackend.length > 0) {
               this.setSessionTaskIds(Array.from(new Set(idsFromBackend)));
             }
+
+            console.log(`Session restored. Total: ${technique.workTime}s, Elapsed: ${session.elapsedSeconds}s, Remaining: ${remainingSeconds}s`);
+
+            this.persistUiState();
+            this.startTimerInterval();
+            this.updateTimerDisplay();
+            this.updateProgressCircle();
           }
         },
         error: (err) => {
@@ -393,12 +425,10 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   updateTimerDisplay(): void {
-    if (!this.timerDisplay?.nativeElement) return;
-    const minutes = Math.floor(this.timeLeft() / 60);
-    const seconds = this.timeLeft() % 60;
-    const formattedTime = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-    this.renderer.setProperty(this.timerDisplay.nativeElement, 'textContent', formattedTime);
-    if (this.floatingTimerDisplay) {
+    // The main timer display is now handled by Angular interpolation: {{ formatTime(timeLeft()) }}
+    // Only update the floating timer display if it exists
+    if (this.floatingTimerDisplay?.nativeElement) {
+      const formattedTime = this.formatTime(this.timeLeft());
       this.renderer.setProperty(this.floatingTimerDisplay.nativeElement, 'textContent', formattedTime);
     }
   }
@@ -495,6 +525,12 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private startTimerInterval(): void {
+    // Prevent multiple simultaneous intervals
+    if (this.timerIntervalSubscription) {
+      console.warn('Timer interval already running, skipping duplicate start');
+      return;
+    }
+
     this.timerIntervalSubscription = interval(1000).subscribe(() => {
       if (this.timeLeft() > 0) {
         this.timeLeft.update(value => value - 1);
@@ -893,6 +929,8 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
   }
 
   private getTotalSecondsForMode(mode: 'work' | 'shortBreak' | 'longBreak'): number {
+    // workTime, shortBreak, and longBreak are all in SECONDS from the backend
+    // (backend converts user input from minutes to seconds)
     if (mode === 'work') return this.currentTechnique.workTime || 0;
     if (mode === 'shortBreak') return this.currentTechnique.shortBreak || 0;
     return this.currentTechnique.longBreak || 0;
