@@ -1,6 +1,6 @@
 import { Component, OnInit, OnDestroy, AfterViewInit, ElementRef, ViewChild, Renderer2, inject, signal, computed, WritableSignal, effect, HostListener } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { interval, Subscription } from 'rxjs';
+import { interval, Subscription, of } from 'rxjs';
 import { FormsModule, ReactiveFormsModule, FormBuilder, FormGroup, Validators } from '@angular/forms';
 import { NavComponent } from '../../shared/components/nav/nav.component';
 import { Technique } from '../../shared/interfaces/technique.interface';
@@ -143,112 +143,143 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
     return isExpirableStatus && due.getTime() < now.getTime();
   }
 
-  ngOnInit(): void {
-    // First restore local UI snapshot from singleton state.
-    const persistedState = this.techniqueService.techniquesUiState();
-    this.currentMode = persistedState.currentMode;
-    this.isRunning = persistedState.isRunning;
-    this.pomodoroCount = persistedState.pomodoroCount;
+ngOnInit(): void {
+  const persistedState = this.techniqueService.techniquesUiState();
+  this.currentMode = persistedState.currentMode;
+  this.isRunning = persistedState.isRunning;
+  this.pomodoroCount = persistedState.pomodoroCount;
 
-    this.techniqueService.fetchTechniques().subscribe(() => {
-      const list = this.techniqueService.techniques();
-      if (!list || list.length === 0) return;
+  const tokenData = this.tokenService.decodeToken();
+  const userId = tokenData?.sub;
 
-      // If we already restored an active backend session, keep that technique/time
-      // and only sync the dropdown selection against the fetched list.
-      if (this.restoredFromActiveSession) {
-        const activeName = this.currentTechnique?.name;
-        const match = activeName ? list.find((t) => t.name === activeName) : undefined;
-        if (match) {
-          this.currentTechnique = match;
+  const sessionCheck$ = userId
+    ? this.techniqueService.getActiveFocusSession(userId)
+    : of(null);
+
+  sessionCheck$.subscribe({
+    next: (session) => {
+      if (session) {
+        const technique = session.technique;
+        this.currentTechnique = technique;
+        this.restoredFromActiveSession = true;
+        this.selectedTechniqueName = technique.name;
+        this.focusSessionStatus = 'in_progress';
+        this.isRunning = true;
+        this.currentMode = 'work';
+
+        // ✅ Usar lastUpdatedAt del sessionStorage para calcular el tiempo real transcurrido
+        const secondsElapsedOffPage = persistedState.lastUpdatedAt
+          ? Math.floor((Date.now() - persistedState.lastUpdatedAt) / 1000)
+          : 0;
+        const restoredTime = persistedState.timeLeft > 0
+          ? Math.max(0, persistedState.timeLeft - secondsElapsedOffPage)
+          : technique.workTime;
+        this.timeLeft.set(restoredTime);
+
+        const idsFromBackend = Array.isArray(session.focusSessionTasks)
+          ? session.focusSessionTasks
+              .map((fst: any) => fst?.task?.id ?? fst?.taskId)
+              .filter((id: any) => typeof id === 'number')
+          : [];
+        if (idsFromBackend.length > 0) {
+          this.setSessionTaskIds(Array.from(new Set(idsFromBackend)));
         }
+      }
+
+      // Cargar técnicas con restoredFromActiveSession ya definido
+      this.techniqueService.fetchTechniques().subscribe(() => {
+        const list = this.techniqueService.techniques();
+        if (!list || list.length === 0) return;
+
+        if (this.restoredFromActiveSession) {
+          const activeName = this.currentTechnique?.name;
+          const match = activeName ? list.find((t) => t.name === activeName) : undefined;
+          if (match) this.currentTechnique = match;
+          this.selectedTechniqueName = this.currentTechnique.name;
+          this.techniqueService.setSelectedTechnique(this.currentTechnique.name);
+          this.persistUiState();
+          this.startTimerInterval();
+          this.updateTimerDisplay();
+          this.updateProgressCircle();
+          return;
+        }
+
+        const persistedName = this.techniqueService.techniquesUiState().selectedTechniqueName;
+        const persistedTechnique = persistedName
+          ? list.find((t) => t.name === persistedName)
+          : undefined;
+        const pomodoro = list.find((t) => t.name.toLowerCase().includes('pomodoro'));
+
+        this.currentTechnique = persistedTechnique || pomodoro || list[0];
         this.selectedTechniqueName = this.currentTechnique.name;
+
+        const totalForMode = this.getTotalSecondsForMode(this.currentMode);
+        const shouldRestoreTime = !!persistedState.isRunning;
+        let restored = shouldRestoreTime && persistedState.timeLeft > 0
+          ? persistedState.timeLeft
+          : totalForMode;
+
+        // ✅ Descontar segundos transcurridos fuera de la página
+        if (shouldRestoreTime && persistedState.timeLeft > 0 && persistedState.lastUpdatedAt) {
+          const secondsElapsedOffPage = Math.floor((Date.now() - persistedState.lastUpdatedAt) / 1000);
+          restored = Math.max(0, restored - secondsElapsedOffPage);
+        }
+
+        const initialTime = totalForMode > 0 ? Math.min(restored, totalForMode) : restored;
+        this.timeLeft.set(initialTime);
+
+        if (persistedState.isRunning && !this.timerIntervalSubscription) {
+          this.startTimerInterval();
+        }
+
         this.techniqueService.setSelectedTechnique(this.currentTechnique.name);
         this.persistUiState();
         this.updateTimerDisplay();
         this.updateProgressCircle();
-        return;
-      }
+      });
+    },
+    error: (err) => {
+      console.log('No active session or error retrieving it:', err);
+      this.techniqueService.fetchTechniques().subscribe(() => {
+        const list = this.techniqueService.techniques();
+        if (!list || list.length === 0) return;
 
-      const persistedName = this.techniqueService.techniquesUiState().selectedTechniqueName;
-      const persistedTechnique = persistedName
-        ? list.find((t) => t.name === persistedName)
-        : undefined;
-      const pomodoro = list.find((t) => t.name.toLowerCase().includes('pomodoro'));
+        const persistedName = this.techniqueService.techniquesUiState().selectedTechniqueName;
+        const persistedTechnique = persistedName
+          ? list.find((t) => t.name === persistedName)
+          : undefined;
+        const pomodoro = list.find((t) => t.name.toLowerCase().includes('pomodoro'));
 
-      this.currentTechnique = persistedTechnique || pomodoro || list[0];
-      this.selectedTechniqueName = this.currentTechnique.name;
+        this.currentTechnique = persistedTechnique || pomodoro || list[0];
+        this.selectedTechniqueName = this.currentTechnique.name;
 
-      if (!this.restoredFromActiveSession) {
         const totalForMode = this.getTotalSecondsForMode(this.currentMode);
-        // Only restore a leftover time when the timer is actually running.
-        // Otherwise, show the full duration for the selected technique/mode.
         const shouldRestoreTime = !!persistedState.isRunning;
-        const restored = shouldRestoreTime && persistedState.timeLeft > 0 ? persistedState.timeLeft : totalForMode;
+        let restored = shouldRestoreTime && persistedState.timeLeft > 0
+          ? persistedState.timeLeft
+          : totalForMode;
+
+        // ✅ Descontar segundos transcurridos fuera de la página
+        if (shouldRestoreTime && persistedState.timeLeft > 0 && persistedState.lastUpdatedAt) {
+          const secondsElapsedOffPage = Math.floor((Date.now() - persistedState.lastUpdatedAt) / 1000);
+          restored = Math.max(0, restored - secondsElapsedOffPage);
+        }
+
         const initialTime = totalForMode > 0 ? Math.min(restored, totalForMode) : restored;
         this.timeLeft.set(initialTime);
 
-        // Fallback: if backend has no active session (e.g. break mode), continue local timer.
         if (persistedState.isRunning && !this.timerIntervalSubscription) {
           this.startTimerInterval();
         }
-      }
 
-      this.techniqueService.setSelectedTechnique(this.currentTechnique.name);
-      this.persistUiState();
-      this.updateTimerDisplay();
-      this.updateProgressCircle();
-    });
-
-    // Check if there's an active focus session and restore it
-    const tokenData = this.tokenService.decodeToken();
-    const userId = tokenData?.sub;
-
-    if (userId) {
-      this.techniqueService.getActiveFocusSession(userId).subscribe({
-        next: (session) => {
-          if (session) {
-            console.log('Active session found:', session);
-            // Restore the timer with elapsed time
-            const technique = session.technique;
-            this.currentTechnique = technique;
-            this.restoredFromActiveSession = true;
-            this.selectedTechniqueName = this.currentTechnique.name;
-
-            // Calculate remaining time: workTime - elapsedSeconds
-            const remainingSeconds = technique.workTime - session.elapsedSeconds;
-            this.timeLeft.set(Math.max(0, remainingSeconds));
-
-            this.focusSessionStatus = 'in_progress';
-            this.isRunning = true;
-            this.currentMode = 'work';
-            this.techniqueService.setSelectedTechnique(this.currentTechnique.name);
-            this.persistUiState();
-
-            // Resume the timer immediately
-            this.startTimerInterval();
-            this.updateTimerDisplay();
-            this.updateProgressCircle();
-
-            console.log(`Session restored. Elapsed: ${session.elapsedSeconds}s, Remaining: ${remainingSeconds}s`);
-
-            // Restore session tasks (if backend includes them).
-            const idsFromBackend = Array.isArray(session.focusSessionTasks)
-              ? session.focusSessionTasks
-                  .map((fst: any) => fst?.task?.id ?? fst?.taskId)
-                  .filter((id: any) => typeof id === 'number')
-              : [];
-            if (idsFromBackend.length > 0) {
-              this.setSessionTaskIds(Array.from(new Set(idsFromBackend)));
-            }
-          }
-        },
-        error: (err) => {
-          console.log('No active session or error retrieving it:', err);
-        }
+        this.techniqueService.setSelectedTechnique(this.currentTechnique.name);
+        this.persistUiState();
+        this.updateTimerDisplay();
+        this.updateProgressCircle();
       });
     }
-  }
+  });
+}
 
   changeTechniqueByName(name: string): void {
     const technique = this.techniqueService.getTechnique(name);
@@ -494,30 +525,31 @@ export class TechniquesComponent implements OnInit, OnDestroy, AfterViewInit {
     }
   }
 
-  private startTimerInterval(): void {
-    this.timerIntervalSubscription = interval(1000).subscribe(() => {
-      if (this.timeLeft() > 0) {
-        this.timeLeft.update(value => value - 1);
-        this.persistUiState();
-        this.updateTimerDisplay();
-        this.updateProgressCircle();
-      } else {
-        // Timer expired - stop interval and mark session as complete
-        if (this.timerIntervalSubscription) {
-          this.timerIntervalSubscription.unsubscribe();
-          this.timerIntervalSubscription = null;
-        }
-        this.isRunning = false;
-
-        // Complete session first (PATCH status='completed')
-        this.completeSession();
-
-        // Then play sound and switch mode
-        this.playNotificationSound();
-        this.switchToNextMode();
-      }
-    });
+private startTimerInterval(): void {
+  // ✅ SIEMPRE cancelar el intervalo anterior antes de crear uno nuevo
+  if (this.timerIntervalSubscription) {
+    this.timerIntervalSubscription.unsubscribe();
+    this.timerIntervalSubscription = null;
   }
+
+  this.timerIntervalSubscription = interval(1000).subscribe(() => {
+    if (this.timeLeft() > 0) {
+      this.timeLeft.update(value => value - 1);
+      this.persistUiState();
+      this.updateTimerDisplay();
+      this.updateProgressCircle();
+    } else {
+      if (this.timerIntervalSubscription) {
+        this.timerIntervalSubscription.unsubscribe();
+        this.timerIntervalSubscription = null;
+      }
+      this.isRunning = false;
+      this.completeSession();
+      this.playNotificationSound();
+      this.switchToNextMode();
+    }
+  });
+}
 
   private completeSession(): void {
     const sessionId = this.techniqueService.currentFocusSessionId();

@@ -174,26 +174,43 @@ export class ProductivityService {
     });
   }
 
-  async getActiveFocusSession(userId: number): Promise<FocusSession> {
-    const focusSession = await this.focusSessionRepository.findOne({
-      where: { user: { id: userId }, status: 'in_progress' },
-      relations: ['technique', 'focusSessionTasks', 'focusSessionTasks.task'],
-      order: { createdAt: 'DESC' },
-    });
+async getActiveFocusSession(userId: number): Promise<FocusSession> {
+  const focusSession = await this.focusSessionRepository.findOne({
+    where: { user: { id: userId }, status: 'in_progress' },
+    relations: ['technique', 'focusSessionTasks', 'focusSessionTasks.task'],
+    order: { createdAt: 'DESC' },
+  });
 
-    if (!focusSession) {
-      throw new NotFoundException('No active focus session found for this user');
-    }
-
-    // Calculate remaining time
-    const now = new Date();
-    const elapsed = Math.floor((now.getTime() - focusSession.createdAt.getTime()) / 1000) + focusSession.elapsedSeconds;
-    
-    return {
-      ...focusSession,
-      elapsedSeconds: elapsed,
-    };
+  if (!focusSession) {
+    throw new NotFoundException('No active focus session found for this user');
   }
+
+// En vez de hardcodear 5 horas, detectar el offset comparando
+// la fecha que devuelve TypeORM con lo que debería ser
+const nowUtc = Date.now();
+const createdAtRaw = new Date(focusSession.createdAt).getTime();
+
+// Si createdAt está en el futuro, TypeORM la está interpretando
+// en hora local del servidor — compensar con el offset real del proceso
+const serverOffsetMs = new Date().getTimezoneOffset() * 60 * 1000; // negativo en UTC-5 → -18000000
+const createdAtUtc = createdAtRaw + serverOffsetMs; // corregir al UTC real
+
+const diffSeconds = Math.floor((nowUtc - createdAtUtc) / 1000);
+const elapsed = diffSeconds + (focusSession.elapsedSeconds ?? 0);
+
+
+  console.log('now UTC:', new Date(nowUtc).toISOString());
+  console.log('createdAt UTC:', new Date(createdAtUtc).toISOString());
+  console.log('diff seconds:', Math.floor((nowUtc - createdAtUtc) / 1000));
+
+
+  console.log('elapsed calculado:', elapsed);
+
+  return {
+    ...focusSession,
+    elapsedSeconds: Math.max(0, elapsed),
+  };
+}
 
   async findOneFocusSession(id: number, userId: number): Promise<FocusSession> {
     const focusSession = await this.focusSessionRepository.findOne({
@@ -210,7 +227,10 @@ export class ProductivityService {
     // If status is being changed to paused, calculate and save elapsed time
     if (updateFocusSessionDto.status === 'paused' && focusSession.status === 'in_progress') {
       const now = new Date();
-      const newElapsed = Math.floor((now.getTime() - focusSession.createdAt.getTime()) / 1000) + focusSession.elapsedSeconds;
+      // Por:
+      const createdAt = new Date(focusSession.createdAt);
+      const diffSeconds = Math.max(0, Math.floor((now.getTime() - createdAt.getTime()) / 1000));
+      const newElapsed = diffSeconds + (focusSession.elapsedSeconds ?? 0);
       focusSession.elapsedSeconds = newElapsed;
       focusSession.pausedAt = now;
     }
@@ -219,7 +239,10 @@ export class ProductivityService {
     if (updateFocusSessionDto.status === 'completed' && focusSession.status !== 'completed') {
       if (focusSession.status === 'in_progress') {
         const now = new Date();
-        const newElapsed = Math.floor((now.getTime() - focusSession.createdAt.getTime()) / 1000) + focusSession.elapsedSeconds;
+        // Por:
+        const createdAt = new Date(focusSession.createdAt);
+        const diffSeconds = Math.max(0, Math.floor((now.getTime() - createdAt.getTime()) / 1000));
+        const newElapsed = diffSeconds + (focusSession.elapsedSeconds ?? 0);
         focusSession.elapsedSeconds = newElapsed;
       }
       // If it was paused, elapsedSeconds is already accumulated.
