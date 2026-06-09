@@ -453,3 +453,36 @@
         height: 120px;
     }
 }
+
+@media (max-width: 768px) {
+  .chart-row {
+    flex-direction: column;
+  }
+
+  .chart-wrapper {
+    height: 200px;
+  }
+
+  .chart-wrapper.bar {
+    height: 220px;
+  }
+
+  .trend-grid {
+    flex-direction: column;
+  }
+
+  .trend-column {
+    width: 100%;
+  }
+
+  .concentration-section,
+  .analysis-section {
+    padding: 20px 15px;
+  }
+
+  .analysis-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}

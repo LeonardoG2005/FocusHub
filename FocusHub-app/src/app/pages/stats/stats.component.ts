@@ -33,6 +33,13 @@ export class StatsComponent implements OnInit, OnDestroy {
   focusTimeTodayLabel = '0m';
   mostUsedTechnique = '';
 
+  // ✅ Compensa el offset de zona horaria del servidor (TypeORM guarda fechas en hora local, no UTC)
+  private parseBackendDate(dateStr: string): Date {
+    const d = new Date(dateStr);
+    const serverOffsetMs = new Date().getTimezoneOffset() * 60 * 1000;
+    return new Date(d.getTime() - serverOffsetMs);
+  }
+
   private toLocalDateKey(date: Date): string {
     const y = date.getFullYear();
     const m = String(date.getMonth() + 1).padStart(2, '0');
@@ -42,12 +49,10 @@ export class StatsComponent implements OnInit, OnDestroy {
 
   private getSessionElapsedSeconds(session: any, now: Date = new Date()): number {
     const base = typeof session?.elapsedSeconds === 'number' ? session.elapsedSeconds : 0;
-
-    // If backend doesn't persist elapsedSeconds for completed sessions yet, fall back.
     const fallback = typeof session?.technique?.workTime === 'number' ? session.technique.workTime : 0;
 
     if (session?.status === 'in_progress' && session?.createdAt) {
-      const startedAt = new Date(session.createdAt);
+      const startedAt = this.parseBackendDate(session.createdAt);
       const delta = Math.floor((now.getTime() - startedAt.getTime()) / 1000);
       return Math.max(0, base + (Number.isFinite(delta) ? delta : 0));
     }
@@ -75,7 +80,7 @@ export class StatsComponent implements OnInit, OnDestroy {
       this.availableYears = Array.from(
         new Set(
           this.sessions
-            .map((s) => (s?.createdAt ? new Date(s.createdAt).getFullYear() : null))
+            .map((s) => (s?.createdAt ? this.parseBackendDate(s.createdAt).getFullYear() : null))
             .filter((y): y is number => typeof y === 'number' && Number.isFinite(y))
         )
       ).sort((a, b) => b - a);
@@ -85,26 +90,23 @@ export class StatsComponent implements OnInit, OnDestroy {
       }
 
       this.processStats();
-      console.log(this.sessions)
       this.createCharts();
-
     });
 
-    // Observa cambios en el atributo data-theme
-  this.themeObserver = new MutationObserver(mutations => {
-    for (const mutation of mutations) {
-      if (
-        mutation.type === 'attributes' &&
-        mutation.attributeName === 'data-theme'
-      ) {
-        this.updateChartThemes();
+    this.themeObserver = new MutationObserver(mutations => {
+      for (const mutation of mutations) {
+        if (
+          mutation.type === 'attributes' &&
+          mutation.attributeName === 'data-theme'
+        ) {
+          this.updateChartThemes();
+        }
       }
-    }
-  });
+    });
 
-  this.themeObserver.observe(document.documentElement, {
-    attributes: true
-  });
+    this.themeObserver.observe(document.documentElement, {
+      attributes: true
+    });
   }
 
   setSelectedYear(year: string | number): void {
@@ -124,7 +126,6 @@ export class StatsComponent implements OnInit, OnDestroy {
     const base = new Date(today);
     base.setFullYear(this.selectedYear);
 
-    // Handle Feb 29 -> Feb 28 when selected year is not leap.
     if (base.getMonth() !== originalMonth) {
       base.setDate(0);
     }
@@ -133,27 +134,21 @@ export class StatsComponent implements OnInit, OnDestroy {
   }
 
   private formatMonthDay(dateKey: string): string {
-    // dateKey is YYYY-MM-DD
     if (typeof dateKey !== 'string' || dateKey.length < 10) return dateKey;
     return dateKey.slice(5);
   }
 
   ngOnDestroy(): void {
-  if (this.barChart) {
-    this.barChart.destroy();
+    if (this.barChart) this.barChart.destroy();
+    if (this.lineChart) this.lineChart.destroy();
+    if (this.trendChart) this.trendChart.destroy();
+    if (this.themeObserver) this.themeObserver.disconnect();
   }
-  if (this.lineChart) {
-    this.lineChart.destroy();
-  }
-  if (this.trendChart) {
-    this.trendChart.destroy();
-  }
-  if (this.themeObserver) this.themeObserver.disconnect(); // 👈
-}
 
   private updateChartThemes(): void {
-  this.createCharts();
-}
+    this.createCharts();
+  }
+
   private getChartColors() {
     const theme = localStorage.getItem('theme') || 'light';
     if (theme === 'dark') {
@@ -186,33 +181,19 @@ export class StatsComponent implements OnInit, OnDestroy {
       scales: {
         y: {
           beginAtZero: true,
-          title: {
-            display: true,
-            text: yLabel,
-            color: colors.text,
-          },
+          title: { display: true, text: yLabel, color: colors.text },
           ticks: { color: colors.text },
           grid: { color: colors.grid }
         },
         x: {
-          title: {
-            display: true,
-            text: xLabel,
-            color: colors.text,
-          },
+          title: { display: true, text: xLabel, color: colors.text },
           ticks: { color: colors.text },
           grid: { color: colors.grid }
         }
       },
       plugins: {
-        legend: {
-          labels: {
-            color: colors.text
-          }
-        },
-        title: {
-          color: colors.text
-        }
+        legend: { labels: { color: colors.text } },
+        title: { color: colors.text }
       }
     };
   }
@@ -227,7 +208,6 @@ export class StatsComponent implements OnInit, OnDestroy {
     const ctx = this.barChartRef.nativeElement.getContext('2d');
     if (!ctx) return;
 
-    // Datos de técnica y horas totales (sumar por técnica)
     const techniqueTimes: Record<string, number> = {};
     const now = new Date();
     for (const session of this.sessions) {
@@ -239,9 +219,7 @@ export class StatsComponent implements OnInit, OnDestroy {
       techniqueTimes[name] = (techniqueTimes[name] || 0) + elapsedSeconds / 3600;
     }
 
-    if (this.barChart) {
-      this.barChart.destroy();
-    }
+    if (this.barChart) this.barChart.destroy();
 
     this.barChart = new Chart(ctx, {
       type: 'bar',
@@ -261,29 +239,26 @@ export class StatsComponent implements OnInit, OnDestroy {
     const ctx = this.lineChartRef.nativeElement.getContext('2d');
     if (!ctx) return;
 
-    // Tareas completadas por día (últimos 7 días)
     const baseDate = this.getBaseDateForSelectedYear();
     const tasksPerDay: Record<string, number> = {};
 
     for (let i = 6; i >= 0; i--) {
       const d = new Date(baseDate);
       d.setDate(baseDate.getDate() - i);
-      const key = this.toLocalDateKey(d);
-      tasksPerDay[key] = 0;
+      tasksPerDay[this.toLocalDateKey(d)] = 0;
     }
 
     for (const session of this.sessions) {
       for (const fst of session.focusSessionTasks) {
-        const date = this.toLocalDateKey(new Date(fst.task.createdAt));
+        // ✅ Usar parseBackendDate
+        const date = this.toLocalDateKey(this.parseBackendDate(fst.task.createdAt));
         if (date in tasksPerDay && fst.task.status === 'completed') {
           tasksPerDay[date]++;
         }
       }
     }
 
-    if (this.lineChart) {
-      this.lineChart.destroy();
-    }
+    if (this.lineChart) this.lineChart.destroy();
 
     const dateKeys = Object.keys(tasksPerDay);
     const labels = dateKeys.map((k) => this.formatMonthDay(k));
@@ -310,30 +285,27 @@ export class StatsComponent implements OnInit, OnDestroy {
     const ctx = this.trendChartRef.nativeElement.getContext('2d');
     if (!ctx) return;
 
-    // Horas de concentración por día (últimos 7 días)
     const baseDate = this.getBaseDateForSelectedYear();
     const focusPerDay: Record<string, number> = {};
 
     for (let i = 6; i >= 0; i--) {
       const d = new Date(baseDate);
       d.setDate(baseDate.getDate() - i);
-      const key = this.toLocalDateKey(d);
-      focusPerDay[key] = 0;
+      focusPerDay[this.toLocalDateKey(d)] = 0;
     }
 
     const now = new Date();
     for (const session of this.sessions) {
       if (!['completed', 'paused', 'in_progress'].includes(session.status)) continue;
-      const date = this.toLocalDateKey(new Date(session.createdAt));
+      // ✅ Usar parseBackendDate
+      const date = this.toLocalDateKey(this.parseBackendDate(session.createdAt));
       if (!(date in focusPerDay)) continue;
 
       const elapsedSeconds = this.getSessionElapsedSeconds(session, now);
       focusPerDay[date] += elapsedSeconds / 3600;
     }
 
-    if (this.trendChart) {
-      this.trendChart.destroy();
-    }
+    if (this.trendChart) this.trendChart.destroy();
 
     const dateKeys = Object.keys(focusPerDay);
     const labels = dateKeys.map((k) => this.formatMonthDay(k));
@@ -365,55 +337,48 @@ export class StatsComponent implements OnInit, OnDestroy {
   }
 
   private isSameLocalDay(dateStr: string, date: Date): boolean {
-  const d = new Date(dateStr);
-  return (
-    d.getFullYear() === date.getFullYear() &&
-    d.getMonth() === date.getMonth() &&
-    d.getDate() === date.getDate()
-  );
-}
-
-private processStats(): void {
-  const today = new Date(); // fecha actual local
-
-  let completedTasks = 0;
-  let pendingTasks = 0;
-  let focusSeconds = 0;
-  const techniqueCount: Record<string, number> = {};
-
-  const now = new Date();
-
-  for (const session of this.sessions) {
-    // ¿Esta sesión es de hoy? (local)
-    const isTodaySession = this.isSameLocalDay(session.createdAt, today);
-
-    if (isTodaySession && ['completed', 'paused', 'in_progress'].includes(session.status)) {
-      focusSeconds += this.getSessionElapsedSeconds(session, now);
-    }
-
-    // Contar técnica usada (en todas las sesiones)
-    const techniqueName = session.technique.name;
-    techniqueCount[techniqueName] = (techniqueCount[techniqueName] || 0) + 1;
-
-    for (const fst of session.focusSessionTasks) {
-      // ¿Esta tarea fue creada hoy (local)?
-      if (this.isSameLocalDay(fst.task.createdAt, today)) {
-        if (fst.task.status === 'completed') completedTasks++;
-        if (fst.task.status !== 'completed') pendingTasks++;
-      }
-    }
+    // ✅ Usar parseBackendDate para compensar offset del servidor
+    const key1 = this.toLocalDateKey(this.parseBackendDate(dateStr));
+    const key2 = this.toLocalDateKey(date);
+    return key1 === key2;
   }
 
-  const totalTasks = completedTasks + pendingTasks;
+  private processStats(): void {
+    const today = new Date();
 
-  this.completedToday = completedTasks;
-  this.pendingToday = pendingTasks;
-  this.progressPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
-  this.focusTimeTodayLabel = this.formatDuration(focusSeconds);
+    let completedTasks = 0;
+    let pendingTasks = 0;
+    let focusSeconds = 0;
+    const techniqueCount: Record<string, number> = {};
 
-  // Técnica más usada global
-  this.mostUsedTechnique = Object.entries(techniqueCount)
-    .sort((a, b) => b[1] - a[1])[0]?.[0] || '';
-}
+    const now = new Date();
 
+    for (const session of this.sessions) {
+      const isTodaySession = this.isSameLocalDay(session.createdAt, today);
+
+      if (isTodaySession && ['completed', 'paused', 'in_progress'].includes(session.status)) {
+        focusSeconds += this.getSessionElapsedSeconds(session, now);
+      }
+
+      const techniqueName = session.technique.name;
+      techniqueCount[techniqueName] = (techniqueCount[techniqueName] || 0) + 1;
+
+      for (const fst of session.focusSessionTasks) {
+        if (this.isSameLocalDay(fst.task.createdAt, today)) {
+          if (fst.task.status === 'completed') completedTasks++;
+          if (fst.task.status !== 'completed') pendingTasks++;
+        }
+      }
+    }
+
+    const totalTasks = completedTasks + pendingTasks;
+
+    this.completedToday = completedTasks;
+    this.pendingToday = pendingTasks;
+    this.progressPercent = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+    this.focusTimeTodayLabel = this.formatDuration(focusSeconds);
+
+    this.mostUsedTechnique = Object.entries(techniqueCount)
+      .sort((a, b) => b[1] - a[1])[0]?.[0] || '';
+  }
 }

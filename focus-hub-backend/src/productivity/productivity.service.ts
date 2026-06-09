@@ -199,12 +199,12 @@ const diffSeconds = Math.floor((nowUtc - createdAtUtc) / 1000);
 const elapsed = diffSeconds + (focusSession.elapsedSeconds ?? 0);
 
 
-  console.log('now UTC:', new Date(nowUtc).toISOString());
-  console.log('createdAt UTC:', new Date(createdAtUtc).toISOString());
-  console.log('diff seconds:', Math.floor((nowUtc - createdAtUtc) / 1000));
+  // console.log('now UTC:', new Date(nowUtc).toISOString());
+  // console.log('createdAt UTC:', new Date(createdAtUtc).toISOString());
+  // console.log('diff seconds:', Math.floor((nowUtc - createdAtUtc) / 1000));
 
 
-  console.log('elapsed calculado:', elapsed);
+  // console.log('elapsed calculado:', elapsed);
 
   return {
     ...focusSession,
