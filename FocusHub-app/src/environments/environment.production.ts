@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiUrl: 'https://focushub-production.up.railway.app'
+  apiUrl: 'https://focushub-backend-e611.onrender.com'
 };
